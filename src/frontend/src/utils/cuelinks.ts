@@ -1,26 +1,24 @@
-const CUELINKS_KEY = "_s6sPu2-OozztXUoBkuyedgJcnNxit4lYDlk1pbWaZU";
-
-/**
- * Wraps a retailer URL with the Cuelinks affiliate tracking URL.
- * Format: https://linker.cuelinks.com/links/go?key=API_KEY&url=ENCODED_URL
- *
- * How it works:
- * - Cuelinks is an affiliate aggregator. When a user clicks the wrapped link,
- *   Cuelinks redirects them to the destination URL and credits your account
- *   with a commission if they purchase.
- * - The API key (_s6sPu2-OozztXUoBkuyedgJcnNxit4lYDlk1pbWaZU) identifies your
- *   Cuelinks publisher account for all 5 retailers at once.
- * - No individual retailer affiliate IDs are needed — Cuelinks handles that.
- */
-export function wrapWithCuelinks(url: string): string {
-  return `https://linker.cuelinks.com/links/go?key=${CUELINKS_KEY}&url=${encodeURIComponent(url)}`;
-}
-
-/**
- * Opens a Cuelinks-wrapped affiliate URL in a new tab.
- * Use this instead of window.open(url) for all retailer links.
- */
-export function openCuelinkUrl(url: string): void {
-  const wrapped = wrapWithCuelinks(url);
-  window.open(wrapped, "_blank", "noopener,noreferrer");
+// Cuelinks removed — direct retailer URLs used instead
+export function buildDirectRetailerUrl(
+  retailer: string,
+  garmentType: string,
+  colorName: string,
+): string {
+  const q = encodeURIComponent(`${garmentType} ${colorName}`);
+  const g = encodeURIComponent(garmentType);
+  const cn = encodeURIComponent(colorName);
+  switch (retailer) {
+    case "amazon":
+      return `https://www.amazon.in/s?k=${g}+${cn}`;
+    case "flipkart":
+      return `https://www.flipkart.com/search?q=${g}+${cn}`;
+    case "myntra":
+      return `https://www.myntra.com/${g}?rawQuery=${q}`;
+    case "ajio":
+      return `https://www.ajio.com/search/?text=${q}`;
+    case "meesho":
+      return `https://www.meesho.com/search?q=${q}`;
+    default:
+      return `https://www.amazon.in/s?k=${q}`;
+  }
 }

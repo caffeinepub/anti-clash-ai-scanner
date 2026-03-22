@@ -26,17 +26,7 @@ import {
   sampleVideoColor,
 } from "../utils/colorUtils";
 
-import { wrapWithCuelinks } from "../utils/cuelinks";
 import { generateGarmentImage } from "../utils/geminiAI";
-// ── Affiliate IDs (swap with real IDs) ─────────────────────────────────────
-const AFFILIATE_IDS = {
-  amazon: "YOUR_AMAZON_AFFILIATE_ID",
-  flipkart: "YOUR_FLIPKART_AFFILIATE_ID",
-  myntra: "YOUR_MYNTRA_AFFILIATE_ID",
-  ajio: "YOUR_AJIO_AFFILIATE_ID",
-  meesho: "YOUR_MEESHO_AFFILIATE_ID",
-};
-
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
   { label: "Top / Shirt", emoji: "👕" },
@@ -332,21 +322,17 @@ function buildRetailerUrl(
   const q = encodeURIComponent(`${garmentKeyword} ${colorName}`);
   switch (retailer) {
     case "amazon":
-      return wrapWithCuelinks(
-        `https://www.amazon.in/s?k=${g}+${cn}&tag=${AFFILIATE_IDS.amazon}`,
-      );
+      return `https://www.amazon.in/s?k=${g}+${cn}`;
     case "flipkart":
-      return wrapWithCuelinks(
-        `https://www.flipkart.com/search?q=${g}+${cn}&affid=${AFFILIATE_IDS.flipkart}`,
-      );
+      return `https://www.flipkart.com/search?q=${g}+${cn}`;
     case "myntra":
-      return wrapWithCuelinks(`https://www.myntra.com/${g}?rawQuery=${q}`);
+      return `https://www.myntra.com/${g}?rawQuery=${q}`;
     case "ajio":
-      return wrapWithCuelinks(`https://www.ajio.com/search/?text=${q}`);
+      return `https://www.ajio.com/search/?text=${q}`;
     case "meesho":
-      return wrapWithCuelinks(`https://www.meesho.com/search?q=${q}`);
+      return `https://www.meesho.com/search?q=${q}`;
     default:
-      return "#";
+      return `https://www.amazon.in/s?k=${q}`;
   }
 }
 
@@ -1866,11 +1852,26 @@ export default function ScannerPage() {
                     <span className="text-[9px] text-foreground block leading-tight font-medium line-clamp-1">
                       {mc.name}
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(mc.hex).then(() => {
+                          toast.success(`Copied ${mc.hex}`);
+                        });
+                      }}
+                      className="text-[8px] text-primary/60 hover:text-primary transition-colors mt-0.5"
+                    >
+                      copy
+                    </button>
                   </div>
                 </motion.button>
               );
             })}
           </div>
+          <p className="text-[10px] text-center text-muted-foreground/70 mt-1">
+            Tap a color to refresh shop links
+          </p>
         </div>
       </motion.div>
 

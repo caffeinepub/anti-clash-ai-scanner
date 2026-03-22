@@ -446,7 +446,7 @@ export default function ProfilePage() {
           </button>
           <div className="flex-1">
             <h2 className="font-display font-bold text-xl text-foreground">
-              {displayName || "Your Profile"}
+              {displayName ? `Hey, ${displayName}` : "Your Profile"}
             </h2>
             <p className="text-sm text-muted-foreground">
               {email || "No email set"}
@@ -474,6 +474,14 @@ export default function ProfilePage() {
               id="displayName"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={(e) => {
+                if (e.target.value.trim()) {
+                  localStorage.setItem(
+                    "colourclash_displayName",
+                    e.target.value.trim(),
+                  );
+                }
+              }}
               placeholder="e.g. Rahul Sharma"
               className="rounded-xl border-border/60 h-11"
               data-ocid="profile.input"

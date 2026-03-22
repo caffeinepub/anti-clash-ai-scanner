@@ -1,14 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  ArrowLeft,
   Bookmark,
   Camera,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Heart,
   Loader2,
-  MessageCircle,
   MoreHorizontal,
   RefreshCw,
   Send,
@@ -21,6 +19,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { SiWhatsapp, SiX } from "react-icons/si";
 import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 const GEMINI_API_KEY = "AIzaSyD3pY6TmTNA17OCAghZJrPfn7zxPYd7cF0";
 
@@ -38,16 +37,16 @@ interface HistoryEntry extends OutfitScore {
   date: string;
 }
 
-function loadHistory(): HistoryEntry[] {
+function loadHistory(key: string): HistoryEntry[] {
   try {
-    return JSON.parse(localStorage.getItem("outfitHistory") || "[]");
+    return JSON.parse(localStorage.getItem(key) || "[]");
   } catch {
     return [];
   }
 }
 
-function saveHistory(entries: HistoryEntry[]) {
-  localStorage.setItem("outfitHistory", JSON.stringify(entries));
+function saveHistory(key: string, entries: HistoryEntry[]) {
+  localStorage.setItem(key, JSON.stringify(entries));
 }
 
 function internalScore(dataUrl: string): OutfitScore {
@@ -97,6 +96,7 @@ function InstagramPostCard({
 }) {
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const grade = getGrade(score.total);
   const color = getScoreColor(score.total);
 
@@ -195,7 +195,7 @@ function InstagramPostCard({
         </motion.div>
       </div>
 
-      {/* Score breakdown — inside card */}
+      {/* Score breakdown */}
       <motion.div
         className="px-4 pt-4 pb-2"
         initial={{ opacity: 0, y: 8 }}
@@ -239,7 +239,6 @@ function InstagramPostCard({
         style={{ borderTop: "0.5px solid oklch(var(--border))" }}
       >
         <div className="flex items-center justify-between">
-          {/* Left cluster */}
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -256,13 +255,6 @@ function InstagramPostCard({
             </button>
             <button
               type="button"
-              className="text-foreground opacity-70"
-              aria-label="Comment"
-            >
-              <MessageCircle className="w-6 h-6" />
-            </button>
-            <button
-              type="button"
               onClick={handleShare}
               className="text-foreground opacity-70 hover:opacity-100 transition-opacity"
               aria-label="Share"
@@ -271,75 +263,77 @@ function InstagramPostCard({
               <Send className="w-6 h-6" />
             </button>
           </div>
-          {/* Right */}
+          <button
+            type="button"
+            onClick={() => setShowShare((v) => !v)}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Share options"
+            data-ocid="outfit.secondary_button"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
           <button
             type="button"
             onClick={() => setBookmarked((v) => !v)}
             className="transition-transform active:scale-90"
-            aria-label="Save"
+            aria-label="Bookmark"
           >
             <Bookmark
               className={`w-6 h-6 transition-colors ${
-                bookmarked
-                  ? "fill-foreground text-foreground"
-                  : "text-foreground opacity-70"
+                bookmarked ? "fill-primary text-primary" : "text-foreground"
               }`}
             />
           </button>
         </div>
-
-        {/* Caption */}
-        <div className="mt-2">
-          <span className="text-sm font-bold text-foreground">
-            Colour Clash Score
-          </span>
-          {score.tips && (
-            <span className="text-sm text-muted-foreground ml-1">
-              {score.tips}
-            </span>
-          )}
-        </div>
       </div>
 
-      {/* Share platform buttons */}
-      <div
-        className="px-4 pb-4 pt-2"
-        style={{ borderTop: "0.5px solid oklch(var(--border))" }}
-      >
-        <p className="text-xs text-muted-foreground mb-2 font-medium">
-          Share to
-        </p>
-        <div className="flex gap-2">
-          <a
-            href={`https://wa.me/?text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-[#25D366] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
-            data-ocid="outfit.secondary_button"
+      {/* Share panel */}
+      <AnimatePresence>
+        {showShare && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
           >
-            <SiWhatsapp className="w-4 h-4" /> WhatsApp
-          </a>
-          <a
-            href={`https://twitter.com/intent/tweet?text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-black text-white text-xs font-semibold hover:opacity-90 transition-opacity"
-            data-ocid="outfit.secondary_button"
-          >
-            <SiX className="w-3.5 h-3.5" /> Twitter/X
-          </a>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors"
-            data-ocid="outfit.secondary_button"
-          >
-            <Copy className="w-4 h-4" /> Copy
-          </button>
-        </div>
-      </div>
+            <div className="px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-2 font-medium">
+                Share to
+              </p>
+              <div className="flex gap-2">
+                <a
+                  href={`https://wa.me/?text=${encodedText}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-[#25D366] text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                  data-ocid="outfit.secondary_button"
+                >
+                  <SiWhatsapp className="w-4 h-4" /> WhatsApp
+                </a>
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodedText}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-black text-white text-xs font-semibold hover:opacity-90 transition-opacity"
+                  data-ocid="outfit.secondary_button"
+                >
+                  <SiX className="w-3.5 h-3.5" /> Twitter/X
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 border border-border text-foreground text-xs font-semibold hover:bg-muted transition-colors"
+                  data-ocid="outfit.secondary_button"
+                >
+                  <Copy className="w-4 h-4" /> Copy
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Score Another Outfit */}
+      {/* Action buttons */}
       <div className="px-4 pb-4">
         <div className="flex gap-2">
           <button
@@ -367,11 +361,12 @@ function InstagramPostCard({
 function HistoryCard({
   entry,
   onDelete,
+  onView,
 }: {
   entry: HistoryEntry;
   onDelete: (id: string) => void;
+  onView: (entry: HistoryEntry) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const badgeColor =
     entry.total >= 70
       ? "bg-emerald-500"
@@ -392,7 +387,8 @@ function HistoryCard({
         <button
           type="button"
           className="flex items-center gap-3 flex-1 min-w-0 text-left"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => onView(entry)}
+          data-ocid="outfit.secondary_button"
         >
           <img
             src={entry.photoDataUrl}
@@ -416,67 +412,20 @@ function HistoryCard({
             <p className="text-xs text-muted-foreground mt-1 truncate">
               {entry.tips}
             </p>
+            <p className="text-xs text-primary/70 mt-0.5 font-medium">
+              Tap to view full score →
+            </p>
           </div>
         </button>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => onDelete(entry.id)}
-            className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors"
-            data-ocid="outfit.delete_button"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="p-1"
-          >
-            {expanded ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => onDelete(entry.id)}
+          className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors flex-shrink-0"
+          data-ocid="outfit.delete_button"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 pb-3 flex flex-col gap-2">
-              <div
-                style={{ borderTop: "0.5px solid oklch(var(--border))" }}
-                className="pt-2"
-              />
-              <div className="space-y-1.5">
-                {[
-                  { label: "Color Harmony (40%)", val: entry.color, max: 40 },
-                  { label: "Fit (30%)", val: entry.fit, max: 30 },
-                  { label: "Style (30%)", val: entry.style, max: 30 },
-                ].map(({ label, val, max }) => (
-                  <div key={label}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className="font-semibold">
-                        {val}/{max}
-                      </span>
-                    </div>
-                    <Progress value={(val / max) * 100} className="h-1.5" />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground italic">
-                &ldquo;{entry.tips}&rdquo;
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
@@ -486,11 +435,29 @@ export default function OutfitScorePage({
 }: {
   onNavigateToSkinTone?: () => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { identity } = useInternetIdentity();
+  const historyKey = `outfitHistory_${
+    identity?.getPrincipal().isAnonymous()
+      ? "anon"
+      : (identity?.getPrincipal().toText() ?? "anon")
+  }`;
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   const [photo, setPhoto] = useState<string | null>(null);
+  const [cropPhoto, setCropPhoto] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [score, setScore] = useState<OutfitScore | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [history, setHistory] = useState<HistoryEntry[]>(() =>
+    loadHistory(historyKey),
+  );
+  const [viewEntry, setViewEntry] = useState<HistoryEntry | null>(null);
+  const [cropRect, setCropRect] = useState({ x: 40, y: 40, w: 220, h: 220 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStart = useRef({ mx: 0, my: 0, rx: 0, ry: 0 });
+  const cropImgRef = useRef<HTMLImageElement>(null);
 
   const saveEntry = (parsed: OutfitScore, dataUrl: string) => {
     const entry: HistoryEntry = {
@@ -505,22 +472,106 @@ export default function OutfitScorePage({
     };
     setHistory((prev) => {
       const updated = [entry, ...prev].slice(0, 20);
-      saveHistory(updated);
+      saveHistory(historyKey, updated);
       return updated;
     });
+    return entry;
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (ev) => {
+    reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
-      setPhoto(dataUrl);
+      setCropPhoto(dataUrl);
       setScore(null);
-      await analyzeOutfit(dataUrl);
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const applyCrop = () => {
+    if (!cropPhoto || !cropImgRef.current) return;
+    const img = cropImgRef.current;
+    const scaleX = img.naturalWidth / img.offsetWidth;
+    const scaleY = img.naturalHeight / img.offsetHeight;
+    const canvas = document.createElement("canvas");
+    canvas.width = cropRect.w * scaleX;
+    canvas.height = cropRect.h * scaleY;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      ctx.drawImage(
+        tempImg,
+        cropRect.x * scaleX,
+        cropRect.y * scaleY,
+        cropRect.w * scaleX,
+        cropRect.h * scaleY,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+      const cropped = canvas.toDataURL("image/jpeg", 0.92);
+      setPhoto(cropped);
+      setCropPhoto(null);
+      analyzeOutfit(cropped);
+    };
+    tempImg.src = cropPhoto;
+  };
+
+  const skipCrop = () => {
+    if (!cropPhoto) return;
+    setPhoto(cropPhoto);
+    setCropPhoto(null);
+    analyzeOutfit(cropPhoto);
+  };
+
+  const getEventXY = (e: React.MouseEvent | React.TouchEvent) => {
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  };
+
+  const handleCropMouseDown = (
+    e: React.MouseEvent | React.TouchEvent,
+    mode: "drag" | "resize",
+  ) => {
+    e.stopPropagation();
+    const { x, y } = getEventXY(e);
+    dragStart.current = { mx: x, my: y, rx: cropRect.x, ry: cropRect.y };
+    if (mode === "drag") setIsDragging(true);
+    else setIsResizing(true);
+  };
+
+  const handleCropMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging && !isResizing) return;
+    const { x, y } = getEventXY(e);
+    const dx = x - dragStart.current.mx;
+    const dy = y - dragStart.current.my;
+    if (isDragging) {
+      setCropRect((prev) => ({
+        ...prev,
+        x: Math.max(0, dragStart.current.rx + dx),
+        y: Math.max(0, dragStart.current.ry + dy),
+      }));
+    } else {
+      setCropRect((prev) => ({
+        ...prev,
+        w: Math.max(60, prev.w + dx),
+        h: Math.max(60, prev.h + dy),
+      }));
+      dragStart.current.mx = x;
+      dragStart.current.my = y;
+    }
+  };
+
+  const handleCropMouseUp = () => {
+    setIsDragging(false);
+    setIsResizing(false);
   };
 
   const analyzeOutfit = async (dataUrl: string) => {
@@ -579,7 +630,7 @@ export default function OutfitScorePage({
   const handleDelete = (id: string) => {
     setHistory((prev) => {
       const updated = prev.filter((h) => h.id !== id);
-      saveHistory(updated);
+      saveHistory(historyKey, updated);
       return updated;
     });
     toast.success("Removed from lookbook.");
@@ -587,9 +638,75 @@ export default function OutfitScorePage({
 
   const handleReset = () => {
     setPhoto(null);
+    setCropPhoto(null);
     setScore(null);
-    // reset file input so same file can be picked again
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setViewEntry(null);
+  };
+
+  const handleRescanEntry = async (entry: HistoryEntry) => {
+    setIsAnalyzing(true);
+    try {
+      const base64 = entry.photoDataUrl.split(",")[1];
+      const mimeMatch = entry.photoDataUrl.match(/data:([^;]+);/);
+      const mimeType = mimeMatch?.[1] ?? "image/jpeg";
+      const prompt =
+        'Analyze this outfit photo. Rate it from 0-100 based on: Color Harmony (40%), Fit (30%), Style & Trends 2026 (30%). Return ONLY valid JSON: {"total": 85, "color": 38, "fit": 27, "style": 20, "tips": "Brief 1-2 sentence tip"}';
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  { inline_data: { mime_type: mimeType, data: base64 } },
+                ],
+              },
+            ],
+          }),
+        },
+      );
+      if (!res.ok) throw new Error("API error");
+      const data = await res.json();
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      const jsonStr = raw
+        .replace(/```json?/g, "")
+        .replace(/```/g, "")
+        .trim();
+      const brace = jsonStr.indexOf("{");
+      const parsed: OutfitScore = JSON.parse(
+        jsonStr.slice(brace, jsonStr.lastIndexOf("}") + 1),
+      );
+      const updatedEntry: HistoryEntry = {
+        ...entry,
+        ...parsed,
+        date: new Date().toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+      };
+      setHistory((prev) => {
+        const updated = prev.map((h) => (h.id === entry.id ? updatedEntry : h));
+        saveHistory(historyKey, updated);
+        return updated;
+      });
+      setViewEntry(updatedEntry);
+    } catch {
+      const fallback = internalScore(entry.photoDataUrl);
+      const updatedEntry: HistoryEntry = { ...entry, ...fallback };
+      setHistory((prev) => {
+        const updated = prev.map((h) => (h.id === entry.id ? updatedEntry : h));
+        saveHistory(historyKey, updated);
+        return updated;
+      });
+      setViewEntry(updatedEntry);
+      toast.info("Using on-device scoring.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -616,151 +733,283 @@ export default function OutfitScorePage({
         )}
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFileChange}
-        data-ocid="outfit.upload_button"
-      />
-
+      {/* ── Lookbook view mode ── */}
       <AnimatePresence mode="wait">
-        {/* Upload / camera UI */}
-        {!photo && !isAnalyzing && (
+        {viewEntry && (
           <motion.div
-            key="upload"
+            key="lookbook-view"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="ios-card"
+            className="flex flex-col gap-4"
           >
             <button
               type="button"
-              className="flex flex-col items-center gap-4 py-10 w-full"
-              onClick={() => fileInputRef.current?.click()}
-              data-ocid="outfit.dropzone"
+              onClick={() => setViewEntry(null)}
+              className="flex items-center gap-2 text-sm text-primary font-medium hover:opacity-80 transition-opacity w-fit"
+              data-ocid="outfit.secondary_button"
             >
-              <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-dashed border-primary/40 flex items-center justify-center">
-                <Camera className="w-10 h-10 text-primary/60" />
-              </div>
-              <div className="text-center px-6">
-                <p className="font-semibold text-foreground text-lg">
-                  Take or Upload Photo
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Capture your outfit and get an instant AI score
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-2xl px-7 py-3 bg-primary text-primary-foreground text-sm font-semibold shadow-md">
-                <Upload className="w-4 h-4" /> Choose Photo
-              </span>
+              <ArrowLeft className="w-4 h-4" /> Back to Lookbook
             </button>
-          </motion.div>
-        )}
-
-        {/* Analysing state — photo shown while loading */}
-        {isAnalyzing && photo && (
-          <motion.div
-            key="analyzing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="rounded-2xl overflow-hidden bg-card border border-border shadow-xl"
-            data-ocid="outfit.loading_state"
-          >
-            {/* Post header */}
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-primary-foreground text-xs font-extrabold">
-                  CC
-                </span>
+            {isAnalyzing ? (
+              <div
+                className="flex flex-col items-center gap-3 py-16"
+                data-ocid="outfit.loading_state"
+              >
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">
+                  Re-analysing outfit...
+                </p>
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-bold">ColourClash</p>
-                <p className="text-xs text-muted-foreground">Outfit Score</p>
-              </div>
-              <Loader2 className="w-5 h-5 text-primary animate-spin" />
-            </div>
-            {/* Photo square */}
-            <div className="relative w-full aspect-square bg-muted overflow-hidden">
-              <img
-                src={photo}
-                alt="Your outfit"
-                className="w-full h-full object-cover opacity-70"
+            ) : (
+              <InstagramPostCard
+                photo={viewEntry.photoDataUrl}
+                score={viewEntry}
+                onReset={handleReset}
+                onRescan={() => handleRescanEntry(viewEntry)}
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
-                </div>
-                <div
-                  className="px-4 py-2 rounded-full text-white text-sm font-medium"
-                  style={{
-                    background: "rgba(0,0,0,0.6)",
-                    backdropFilter: "blur(8px)",
-                  }}
-                >
-                  Analysing with AI...
-                </div>
-              </div>
-            </div>
-            <div className="px-4 py-3 text-center text-xs text-muted-foreground">
-              Checking color harmony, fit, and 2026 style trends
-            </div>
+            )}
           </motion.div>
-        )}
-
-        {/* Instagram post card result */}
-        {photo && score && !isAnalyzing && (
-          <InstagramPostCard
-            key="result"
-            photo={photo}
-            score={score}
-            onReset={handleReset}
-            onRescan={() => photo && analyzeOutfit(photo)}
-          />
         )}
       </AnimatePresence>
 
-      {/* Share icon legend under the card — only visible on result */}
-      {photo && score && !isAnalyzing && (
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Share your look with friends</span>
-        </div>
+      {/* ── Main scoring flow (hidden when viewing a lookbook entry) ── */}
+      {!viewEntry && (
+        <>
+          {/* Hidden file inputs */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+            data-ocid="outfit.upload_button"
+          />
+
+          <AnimatePresence mode="wait">
+            {/* Crop step */}
+            {cropPhoto && !isAnalyzing && (
+              <motion.div
+                key="crop"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                className="ios-card overflow-hidden"
+                data-ocid="outfit.card"
+              >
+                <div className="px-4 py-3 bg-muted/20 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">
+                    Crop your photo
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Drag box · corner to resize
+                  </p>
+                </div>
+                <div
+                  className="relative select-none overflow-hidden"
+                  style={{
+                    maxHeight: 360,
+                    cursor: isDragging ? "grabbing" : "default",
+                  }}
+                  onMouseMove={handleCropMouseMove}
+                  onMouseUp={handleCropMouseUp}
+                  onTouchMove={handleCropMouseMove}
+                  onTouchEnd={handleCropMouseUp}
+                >
+                  <img
+                    ref={cropImgRef}
+                    src={cropPhoto}
+                    alt="crop"
+                    className="w-full object-contain"
+                    style={{ maxHeight: 360, display: "block" }}
+                    draggable={false}
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ background: "rgba(0,0,0,0.45)" }}
+                  />
+                  <div
+                    className="absolute border-2 border-white/90"
+                    style={{
+                      left: cropRect.x,
+                      top: cropRect.y,
+                      width: cropRect.w,
+                      height: cropRect.h,
+                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                      cursor: "grab",
+                    }}
+                    onMouseDown={(e) => handleCropMouseDown(e, "drag")}
+                    onTouchStart={(e) => handleCropMouseDown(e, "drag")}
+                  >
+                    <div
+                      className="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-tl-md cursor-se-resize flex items-center justify-center"
+                      style={{ fontSize: 10, color: "#333" }}
+                      onMouseDown={(e) => handleCropMouseDown(e, "resize")}
+                      onTouchStart={(e) => handleCropMouseDown(e, "resize")}
+                    >
+                      ⤡
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2 p-3">
+                  <button
+                    type="button"
+                    onClick={skipCrop}
+                    className="flex-1 rounded-2xl border border-border py-2.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
+                    data-ocid="outfit.secondary_button"
+                  >
+                    Skip Crop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyCrop}
+                    className="flex-1 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                    data-ocid="outfit.primary_button"
+                  >
+                    ✓ Crop &amp; Analyse
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Analyzing spinner */}
+            {isAnalyzing && (
+              <motion.div
+                key="analyzing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="ios-card flex flex-col items-center gap-4 py-16"
+                data-ocid="outfit.loading_state"
+              >
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                <p className="text-sm font-medium text-foreground">
+                  Analysing your outfit...
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  AI is judging colour, fit & style
+                </p>
+              </motion.div>
+            )}
+
+            {/* Instagram post card — fresh score */}
+            {photo && score && !isAnalyzing && !cropPhoto && (
+              <motion.div
+                key="result"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <InstagramPostCard
+                  photo={photo}
+                  score={score}
+                  onReset={handleReset}
+                  onRescan={() => {
+                    if (photo) analyzeOutfit(photo);
+                  }}
+                />
+              </motion.div>
+            )}
+
+            {/* Upload UI */}
+            {!photo && !isAnalyzing && !cropPhoto && (
+              <motion.div
+                key="upload"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                className="ios-card"
+              >
+                <div
+                  className="flex flex-col items-center gap-4 py-10 w-full px-6"
+                  data-ocid="outfit.dropzone"
+                >
+                  <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-dashed border-primary/40 flex items-center justify-center">
+                    <Camera className="w-10 h-10 text-primary/60" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-foreground text-lg">
+                      Score Your Outfit
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Take a photo or pick from gallery for instant AI scoring
+                    </p>
+                  </div>
+                  <div className="flex gap-3 w-full max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-3 text-sm font-semibold hover:opacity-90 transition-opacity"
+                      data-ocid="outfit.primary_button"
+                    >
+                      <Camera className="w-4 h-4" /> Camera
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 text-primary py-3 text-sm font-semibold hover:bg-primary/10 transition-colors"
+                      data-ocid="outfit.upload_button"
+                    >
+                      <Upload className="w-4 h-4" /> Gallery
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
       )}
 
-      {/* Lookbook History */}
-      {history.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display font-bold text-lg">Lookbook</h3>
+      {/* ── Lookbook / History ── */}
+      {!viewEntry && history.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-foreground text-base">
+              Lookbook
+            </h3>
             <Badge variant="secondary" className="text-xs">
-              {history.length} outfits
+              {history.length} entries
             </Badge>
           </div>
-          <AnimatePresence>
-            {history.map((entry) => (
-              <HistoryCard
-                key={entry.id}
-                entry={entry}
-                onDelete={handleDelete}
-              />
-            ))}
-          </AnimatePresence>
+          <div className="flex flex-col gap-2">
+            <AnimatePresence>
+              {history.map((entry) => (
+                <HistoryCard
+                  key={entry.id}
+                  entry={entry}
+                  onDelete={handleDelete}
+                  onView={setViewEntry}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
       )}
 
-      {history.length === 0 && (
-        <div
-          className="text-center py-8 text-muted-foreground text-sm"
-          data-ocid="outfit.empty_state"
-        >
-          <Star className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Your scored outfits will appear here
-        </div>
-      )}
+      {!viewEntry &&
+        history.length === 0 &&
+        !photo &&
+        !cropPhoto &&
+        !isAnalyzing && (
+          <div
+            className="text-center py-8 text-muted-foreground"
+            data-ocid="outfit.empty_state"
+          >
+            <p className="text-3xl mb-2">📸</p>
+            <p className="text-sm">Your lookbook is empty.</p>
+            <p className="text-xs mt-1">
+              Score an outfit to start your style diary.
+            </p>
+          </div>
+        )}
     </div>
   );
 }
