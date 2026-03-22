@@ -1,0 +1,190 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/assets/fonts/Figtree.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/assets/fonts/PlusJakartaSans.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("/assets/fonts/PlayfairDisplay.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 1rem;
+    /* Royal White & Blue — Light Mode */
+    --background: 0.97 0.008 255;
+    --foreground: 0.16 0.025 255;
+    --card: 0.99 0.003 255;
+    --card-foreground: 0.16 0.025 255;
+    --popover: 0.99 0.003 255;
+    --popover-foreground: 0.16 0.025 255;
+    --primary: 0.42 0.22 255;
+    --primary-foreground: 0.98 0.003 255;
+    --secondary: 0.93 0.02 255;
+    --secondary-foreground: 0.32 0.06 255;
+    --muted: 0.94 0.015 255;
+    --muted-foreground: 0.52 0.04 255;
+    --accent: 0.55 0.18 245;
+    --accent-foreground: 0.98 0.003 255;
+    --destructive: 0.58 0.22 25;
+    --destructive-foreground: 0.98 0 0;
+    --border: 0.88 0.025 255;
+    --input: 0.88 0.025 255;
+    --ring: 0.42 0.22 255;
+    --success: 0.6 0.18 155;
+    --success-foreground: 0.98 0 0;
+    --chart-1: 0.42 0.22 255;
+    --chart-2: 0.6 0.18 155;
+    --chart-3: 0.65 0.18 60;
+    --chart-4: 0.55 0.18 210;
+    --chart-5: 0.65 0.18 30;
+    --sidebar: 0.97 0.008 255;
+    --sidebar-foreground: 0.16 0.025 255;
+    --sidebar-primary: 0.42 0.22 255;
+    --sidebar-primary-foreground: 0.98 0.003 255;
+    --sidebar-accent: 0.93 0.02 255;
+    --sidebar-accent-foreground: 0.32 0.06 255;
+    --sidebar-border: 0.88 0.025 255;
+    --sidebar-ring: 0.42 0.22 255;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", "Figtree", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .text-success {
+    color: oklch(var(--success));
+  }
+  .bg-success {
+    background-color: oklch(var(--success));
+  }
+  .border-success {
+    border-color: oklch(var(--success));
+  }
+  /* Royal frosted glass effect — white/blue tint */
+  .ios-glass {
+    background: oklch(0.99 0.005 255 / 0.88);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-bottom: 1px solid oklch(0.88 0.025 255 / 0.6);
+  }
+  .ios-glass-light {
+    background: oklch(0.96 0.012 255 / 0.82);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+  }
+  /* iOS separator */
+  .ios-separator {
+    height: 0.5px;
+    background: oklch(var(--border));
+  }
+  /* iOS card — crisp white paper with blue glow */
+  .ios-card {
+    background: oklch(var(--card));
+    border-radius: 1.25rem;
+    border: 1px solid oklch(var(--border));
+    box-shadow: 0 2px 16px oklch(0.42 0.22 255 / 0.08);
+    overflow: hidden;
+  }
+  /* iOS grouped section */
+  .ios-section-header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: oklch(var(--muted-foreground));
+    padding: 0 0.25rem 0.5rem;
+  }
+  .font-display {
+    font-family: "Playfair Display", "Georgia", serif;
+  }
+  /* Reticle */
+  .reticle-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 88px;
+    height: 88px;
+    border: 2px solid oklch(var(--primary));
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 20px oklch(var(--primary) / 0.35);
+  }
+  .reticle-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background-color: oklch(var(--primary));
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  /* Camera corners */
+  .camera-corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: oklch(var(--primary));
+    border-style: solid;
+  }
+  .camera-corner-tl {
+    top: 14px;
+    left: 14px;
+    border-width: 2.5px 0 0 2.5px;
+    border-top-left-radius: 6px;
+  }
+  .camera-corner-tr {
+    top: 14px;
+    right: 14px;
+    border-width: 2.5px 2.5px 0 0;
+    border-top-right-radius: 6px;
+  }
+  .camera-corner-bl {
+    bottom: 14px;
+    left: 14px;
+    border-width: 0 0 2.5px 2.5px;
+    border-bottom-left-radius: 6px;
+  }
+  .camera-corner-br {
+    bottom: 14px;
+    right: 14px;
+    border-width: 0 2.5px 2.5px 0;
+    border-bottom-right-radius: 6px;
+  }
+  /* Swatch shadow */
+  .swatch-shadow {
+    box-shadow: 0 4px 12px -2px oklch(0.42 0.22 255 / 0.25), 0 0 0 1.5px
+      oklch(var(--border));
+  }
+}
