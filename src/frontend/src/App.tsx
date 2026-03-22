@@ -12,6 +12,7 @@ import {
   ScanLine,
   Sparkles,
   Star,
+  Tag,
   TrendingUp,
   UserCircle,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import {
   InternetIdentityProvider,
   useInternetIdentity,
 } from "./hooks/useInternetIdentity";
+import BestDealsPage from "./pages/BestDealsPage";
 import FavoritesPage from "./pages/FavoritesPage";
 import OutfitScorePage from "./pages/OutfitScorePage";
 import ProfilePage from "./pages/ProfilePage";
@@ -44,7 +46,8 @@ type Tab =
   | "profile"
   | "score"
   | "trends"
-  | "skintone";
+  | "skintone"
+  | "deals";
 
 const NAV_TABS: {
   id: Tab;
@@ -55,7 +58,7 @@ const NAV_TABS: {
   { id: "favorites", label: "Favorites", Icon: Heart },
   { id: "score", label: "Score", Icon: Star },
   { id: "trends", label: "Trends", Icon: TrendingUp },
-  { id: "profile", label: "Profile", Icon: UserCircle },
+  { id: "deals" as const, label: "Deals", Icon: Tag },
 ];
 
 // --- Login Welcome Modal ---
@@ -180,6 +183,27 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(() =>
     localStorage.getItem("profilePhotoUrl"),
   );
+  const [streak, setStreak] = useState(1);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const lastDate = localStorage.getItem("colourClash_streakDate");
+    const storedCount = Number.parseInt(
+      localStorage.getItem("colourClash_streakCount") || "1",
+      10,
+    );
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    let newCount = 1;
+    if (lastDate === today) {
+      newCount = storedCount;
+    } else if (lastDate === yesterday) {
+      newCount = storedCount + 1;
+    }
+    localStorage.setItem("colourClash_streakDate", today);
+    localStorage.setItem("colourClash_streakCount", String(newCount));
+    setStreak(newCount);
+  }, []);
+
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
@@ -259,6 +283,11 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
               )}
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-background" />
+            {streak >= 2 && (
+              <span className="absolute -top-1.5 -right-1.5 text-[8px] leading-none bg-orange-500 text-white rounded-full px-1 py-0.5 font-black border border-background">
+                {streak}
+              </span>
+            )}
           </div>
           <span className="text-[9px] font-semibold text-primary">
             {displayName}
@@ -332,6 +361,7 @@ function AppContent() {
     score: { subtitle: "AI outfit score" },
     trends: { subtitle: "2026 trends" },
     skintone: { subtitle: "Skin tone analysis" },
+    deals: { subtitle: "Best deals today" },
   };
 
   const current = pageTitles[activeTab];
@@ -413,6 +443,7 @@ function AppContent() {
             )}
             {activeTab === "trends" && <TrendRadarPage />}
             {activeTab === "skintone" && <SkinTonePage />}
+            {activeTab === "deals" && <BestDealsPage />}
           </motion.div>
         </AnimatePresence>
       </main>

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import {
   Camera,
   Heart,
+  Layers,
+  LayoutGrid,
   Loader2,
   Lock,
   RefreshCw,
@@ -305,6 +307,27 @@ const RETAILERS = [
     badgeClass: "bg-teal-500 text-white",
     color: "#0D9488",
   },
+  {
+    key: "nykaa" as const,
+    label: "Nykaa Fashion",
+    badge: "Nykaa",
+    badgeClass: "bg-pink-600 text-white",
+    color: "#FC2779",
+  },
+  {
+    key: "indya" as const,
+    label: "Indya",
+    badge: "Indya",
+    badgeClass: "bg-rose-800 text-white",
+    color: "#9B2335",
+  },
+  {
+    key: "offduty" as const,
+    label: "Offduty India",
+    badge: "Offduty",
+    badgeClass: "bg-yellow-800 text-white",
+    color: "#8B6914",
+  },
 ];
 
 // Always return all 5 retailers
@@ -331,6 +354,12 @@ function buildRetailerUrl(
       return `https://www.ajio.com/search/?text=${q}`;
     case "meesho":
       return `https://www.meesho.com/search?q=${q}`;
+    case "nykaa":
+      return `https://www.nykaafashion.com/search/result/?q=${q}`;
+    case "indya":
+      return `https://www.theindya.com/search?q=${q}`;
+    case "offduty":
+      return `https://www.offdutyindia.com/search?type=product&q=${q}`;
     default:
       return `https://www.amazon.in/s?k=${q}`;
   }
@@ -799,6 +828,9 @@ function ShopMatchingStyles({
   userGender,
   selectedMatchingColor,
 }: ShopMatchingStylesProps) {
+  const [layoutMode, setLayoutMode] = useState<"accordion" | "tabs">("tabs");
+  const [activeRetailerTab, setActiveRetailerTab] = useState(0);
+
   const shopColor = selectedMatchingColor ?? { hex: colorHex, name: colorName };
   const complementaryLabels = COMPLEMENTARY_GARMENT_MAP[garment.label] ?? [
     "Top / Shirt",
@@ -813,6 +845,8 @@ function ShopMatchingStyles({
     }))
     .filter((s) => s.garment && s.products.length > 0);
 
+  const allRetailers = RETAILERS;
+
   if (sections.length === 0) {
     return (
       <div className="p-6 text-center">
@@ -823,68 +857,241 @@ function ShopMatchingStyles({
     );
   }
 
+  const renderProductSections = () => (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={shopColor.hex}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+        className="space-y-3"
+      >
+        {sections.map((section, si) => (
+          <motion.div
+            key={section.label}
+            className="space-y-2"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: si * 0.07,
+              type: "spring",
+              stiffness: 350,
+              damping: 28,
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-base">{section.garment!.emoji}</span>
+              <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                {section.label}
+              </span>
+              <div className="flex-1 h-px bg-border/40" />
+            </div>
+            <div
+              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {section.products.map((product, pi) => (
+                <ProductCard
+                  key={`${product.garmentLabel}-${product.name}-${shopColor.hex}`}
+                  product={product}
+                  colorHex={shopColor.hex}
+                  colorName={shopColor.name}
+                  index={si * 4 + pi}
+                />
+              ))}
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+    </AnimatePresence>
+  );
+
   return (
-    <div className="space-y-4 p-4">
-      {/* Colour context label */}
+    <div className="space-y-3 p-4">
+      {/* Header row: color context + layout toggle */}
       <div className="flex items-center gap-2">
         <div
-          className="w-4 h-4 rounded-full swatch-shadow"
+          className="w-4 h-4 rounded-full swatch-shadow flex-shrink-0"
           style={{ backgroundColor: shopColor.hex }}
         />
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground flex-1">
           Showing products for:{" "}
           <span className="font-semibold text-foreground">
             {shopColor.name}
           </span>
         </span>
+        {/* Layout toggle */}
+        <div className="flex items-center gap-1 bg-muted rounded-xl p-0.5">
+          <button
+            type="button"
+            onClick={() => setLayoutMode("accordion")}
+            className={`p-1.5 rounded-lg transition-all ${
+              layoutMode === "accordion"
+                ? "bg-background shadow text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="By garment type"
+            data-ocid="scanner.toggle"
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLayoutMode("tabs")}
+            className={`p-1.5 rounded-lg transition-all ${
+              layoutMode === "tabs"
+                ? "bg-background shadow text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title="By retailer"
+            data-ocid="scanner.toggle"
+          >
+            <Layers className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div
-          key={shopColor.hex}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ type: "spring", stiffness: 380, damping: 32 }}
-          className="space-y-3"
-        >
-          {sections.map((section, si) => (
-            <motion.div
-              key={section.label}
-              className="space-y-2"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: si * 0.07,
-                type: "spring",
-                stiffness: 350,
-                damping: 28,
-              }}
+        {layoutMode === "accordion" ? (
+          <motion.div
+            key="accordion"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          >
+            {renderProductSections()}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="tabs"
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            className="space-y-3"
+          >
+            {/* Retailer tabs */}
+            <div
+              className="flex gap-2 overflow-x-auto pb-1"
+              style={{ scrollbarWidth: "none" }}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-base">{section.garment!.emoji}</span>
-                <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                  {section.label}
-                </span>
-                <div className="flex-1 h-px bg-border/40" />
-              </div>
-              <div
-                className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-                style={{ scrollbarWidth: "none" }}
+              {allRetailers.map((retailer, ri) => (
+                <button
+                  key={retailer.key}
+                  type="button"
+                  onClick={() => setActiveRetailerTab(ri)}
+                  className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all border ${
+                    activeRetailerTab === ri
+                      ? "text-white border-transparent shadow-sm"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}
+                  style={
+                    activeRetailerTab === ri
+                      ? {
+                          backgroundColor: retailer.color,
+                          borderColor: retailer.color,
+                        }
+                      : {}
+                  }
+                  data-ocid="scanner.tab"
+                >
+                  {retailer.badge}
+                </button>
+              ))}
+            </div>
+
+            {/* Active retailer content */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeRetailerTab + shopColor.hex}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                className="space-y-3"
               >
-                {section.products.map((product, pi) => (
-                  <ProductCard
-                    key={`${product.garmentLabel}-${product.name}-${shopColor.hex}`}
-                    product={product}
-                    colorHex={shopColor.hex}
-                    colorName={shopColor.name}
-                    index={si * 4 + pi}
-                  />
-                ))}
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+                {sections.map((section, si) => {
+                  const retailer = allRetailers[activeRetailerTab];
+                  const keyword =
+                    GARMENT_KEYWORD_MAP[section.label] ?? "clothing";
+                  return (
+                    <div key={section.label} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">
+                          {section.garment!.emoji}
+                        </span>
+                        <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                          {section.label}
+                        </span>
+                        <div className="flex-1 h-px bg-border/40" />
+                      </div>
+                      <div
+                        className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+                        style={{ scrollbarWidth: "none" }}
+                      >
+                        {section.products.slice(0, 3).map((product, pi) => (
+                          <motion.div
+                            key={`${product.garmentLabel}-${product.name}`}
+                            className="ios-card overflow-hidden flex-shrink-0"
+                            style={{ width: 150 }}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{
+                              delay: (si * 3 + pi) * 0.05,
+                              type: "spring",
+                              stiffness: 350,
+                              damping: 28,
+                            }}
+                            data-ocid={`scanner.item.${si * 3 + pi + 1}`}
+                          >
+                            <div
+                              className="relative"
+                              style={{ aspectRatio: "4/5" }}
+                            >
+                              <GarmentImageCard
+                                garmentType={product.garmentLabel}
+                                hexColor={shopColor.hex}
+                              />
+                              <div
+                                className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5"
+                                style={{
+                                  backgroundColor: shopColor.hex,
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                                }}
+                              >
+                                <div className="w-2.5 h-2.5 rounded-full bg-white/50" />
+                              </div>
+                            </div>
+                            <div className="p-2.5">
+                              <p className="text-xs font-semibold text-foreground leading-tight mb-2 line-clamp-2">
+                                {product.name}
+                              </p>
+                              <a
+                                href={buildRetailerUrl(
+                                  retailer.key,
+                                  keyword,
+                                  shopColor.name,
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`block text-center text-[10px] font-bold rounded-xl py-1.5 text-white transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
+                                data-ocid="scanner.link"
+                              >
+                                Shop on {retailer.badge}
+                              </a>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </motion.div>
+            </AnimatePresence>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
@@ -1079,6 +1286,160 @@ function generateLocalHarmonyPalette(hex: string): HarmonyPalette {
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
+
+// ── Color of the Day Banner ────────────────────────────────────────────────
+const COLOR_OF_DAY_PALETTE = [
+  { name: "Crimson Red", hex: "#DC143C" },
+  { name: "Cobalt Blue", hex: "#0047AB" },
+  { name: "Sage Green", hex: "#87AE73" },
+  { name: "Dusty Rose", hex: "#DCAE96" },
+  { name: "Mustard Yellow", hex: "#FFDB58" },
+  { name: "Burnt Orange", hex: "#CC5500" },
+  { name: "Lavender", hex: "#967BB6" },
+  { name: "Teal", hex: "#008080" },
+  { name: "Champagne", hex: "#F7E7CE" },
+  { name: "Slate Blue", hex: "#6A5ACD" },
+  { name: "Terracotta", hex: "#E2725B" },
+  { name: "Forest Green", hex: "#228B22" },
+  { name: "Blush Pink", hex: "#FF6EB4" },
+  { name: "Ivory White", hex: "#FFFFF0" },
+  { name: "Charcoal", hex: "#36454F" },
+  { name: "Coral", hex: "#FF7F50" },
+  { name: "Peacock Blue", hex: "#005F6B" },
+  { name: "Marigold", hex: "#EAA221" },
+  { name: "Plum", hex: "#DDA0DD" },
+  { name: "Caramel", hex: "#C68642" },
+  { name: "Jade", hex: "#00A86B" },
+  { name: "Berry", hex: "#8E2D56" },
+  { name: "Powder Blue", hex: "#B0C4DE" },
+  { name: "Warm Sand", hex: "#C2B280" },
+  { name: "Lilac", hex: "#C8A2C8" },
+  { name: "Deep Navy", hex: "#17375E" },
+  { name: "Olive", hex: "#808000" },
+  { name: "Peach", hex: "#FFCBA4" },
+  { name: "Ruby", hex: "#9B111E" },
+  { name: "Emerald", hex: "#50C878" },
+];
+
+const COLOR_OF_DAY_TIPS: Record<string, string> = {
+  "Crimson Red": "Bold and passionate — pair with navy or ivory for impact.",
+  "Cobalt Blue": "Timeless confidence — great with white, grey, or camel.",
+  "Sage Green": "Earthy and calming — works beautifully with tan and cream.",
+  "Dusty Rose": "Soft romance — complement with beige, ivory, or mauve.",
+  "Mustard Yellow": "Cheerful warmth — pair with deep brown or forest green.",
+  "Burnt Orange": "Autumnal energy — stunning with navy, cream, or olive.",
+  Lavender: "Dreamy softness — pair with white, lilac, or silver.",
+  Teal: "Sophisticated cool — combine with gold, coral, or white.",
+  Champagne: "Understated luxury — works with any neutral or pastels.",
+  "Slate Blue": "Moody elegance — great with burgundy or soft grey.",
+  Terracotta: "Earthy warmth — stunning with turquoise or sand tones.",
+  "Forest Green": "Rich nature — pair with cognac, cream, or gold.",
+  "Blush Pink": "Feminine freshness — beautiful with white or nude tones.",
+  "Ivory White": "Clean clarity — pairs with anything, especially jewel tones.",
+  Charcoal: "Understated power — accent with any pop color.",
+  Coral: "Vibrant warmth — pairs with teal, navy, or light gold.",
+  "Peacock Blue": "Jewel-toned depth — great with copper or white.",
+  Marigold: "Sun-kissed energy — pair with deep purple or navy.",
+  Plum: "Rich drama — combine with dusty pink or champagne.",
+  Caramel: "Warm luxe — stunning with ivory, rust, or deep teal.",
+  Jade: "Vibrant elegance — pair with cream, gold, or navy.",
+  Berry: "Bold femininity — works with lavender or soft gold.",
+  "Powder Blue": "Serene softness — pair with white, silver, or blush.",
+  "Warm Sand": "Desert neutrality — goes with everything earthy.",
+  Lilac: "Soft ethereal — pairs with dusty rose or dove grey.",
+  "Deep Navy": "Classic authority — accent with white, gold, or red.",
+  Olive: "Cool utilitarian — great with tan, rust, or mustard.",
+  Peach: "Sweet warmth — beautiful with coral, cream, or mint.",
+  Ruby: "Passionate drama — pair with black, ivory, or gold.",
+  Emerald: "Regal vibrancy — stunning with gold, cream, or black.",
+};
+
+function getColorOfDay() {
+  const dayOfYear = Math.floor(
+    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
+      86400000,
+  );
+  return COLOR_OF_DAY_PALETTE[dayOfYear % COLOR_OF_DAY_PALETTE.length];
+}
+
+function ColorOfDayBanner() {
+  const [dismissed, setDismissed] = useState(() => {
+    const key = "colourClash_colorOfDay_date";
+    return localStorage.getItem(key) === new Date().toDateString();
+  });
+  const color = getColorOfDay();
+  const tip =
+    COLOR_OF_DAY_TIPS[color.name] ?? "A stunning choice for today's look!";
+
+  const handleDismiss = () => {
+    localStorage.setItem(
+      "colourClash_colorOfDay_date",
+      new Date().toDateString(),
+    );
+    setDismissed(true);
+  };
+
+  if (dismissed) return null;
+
+  return (
+    <motion.div
+      className="ios-card overflow-hidden"
+      initial={{ opacity: 0, y: -16, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -16, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+      data-ocid="scanner.card"
+    >
+      <div className="h-1" style={{ backgroundColor: color.hex }} />
+      <div className="flex items-center gap-3 px-4 py-3">
+        <div
+          className="w-10 h-10 rounded-2xl flex-shrink-0 swatch-shadow border-2 border-white/20"
+          style={{ backgroundColor: color.hex }}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+              Colour of the Day
+            </span>
+          </div>
+          <p className="text-sm font-black text-foreground">{color.name}</p>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            {tip}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          data-ocid="scanner.close_button"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
+      <div className="px-4 py-2.5">
+        <p className="text-[10px] text-muted-foreground mb-2">
+          Quick shop in {color.name}:
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {RETAILERS.slice(0, 5).map((retailer) => (
+            <a
+              key={retailer.key}
+              href={buildRetailerUrl(retailer.key, "clothing", color.name)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`text-[9px] font-bold rounded-full px-2 py-1 transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
+              data-ocid="scanner.link"
+            >
+              {retailer.badge}
+            </a>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function ScannerPage() {
   const [lockedColor, setLockedColor] = useState<string | null>(null);
   const [detectedColor, setDetectedColor] = useState<string>("#808080");
@@ -1272,6 +1633,11 @@ export default function ScannerPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-4">
+      {/* ── Colour of the Day ── */}
+      <AnimatePresence>
+        <ColorOfDayBanner />
+      </AnimatePresence>
+
       {/* ── Camera Card ── */}
       <motion.div
         className="ios-card shadow-2xl"
