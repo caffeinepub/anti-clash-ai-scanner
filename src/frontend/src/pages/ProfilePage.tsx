@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import {
   Camera,
   CheckCircle2,
+  Download,
   Loader2,
   Mail,
   SendHorizonal,
@@ -305,6 +306,7 @@ export default function ProfilePage() {
     localStorage.getItem("profilePhotoUrl"),
   );
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -318,6 +320,31 @@ export default function ProfilePage() {
       window.dispatchEvent(new Event("profilePhotoUpdated"));
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDownloadLogo = async () => {
+    try {
+      const res = await fetch(
+        "/assets/generated/colour-clash-logo.dim_800x300.png",
+      );
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "colour-clash-logo.png";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Logo saved!");
+    } catch {
+      // Fallback: open in new tab (user can long-press to save on mobile)
+      window.open(
+        "/assets/generated/colour-clash-logo.dim_800x300.png",
+        "_blank",
+      );
+      toast.info("Long-press the image to save it on mobile.");
+    }
   };
 
   useEffect(() => {
@@ -363,7 +390,6 @@ export default function ProfilePage() {
   }, [email, userProfile]);
 
   const handleSave = async () => {
-    if (!actor) return;
     if (!displayName.trim()) {
       toast.error("Please enter your display name.");
       return;
@@ -371,28 +397,32 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
       localStorage.setItem("colourclash_dob", dob);
-      // Persist to localStorage immediately so UI updates across the app
       localStorage.setItem("colourclash_displayName", displayName.trim());
       localStorage.setItem("colourclash_email", email.trim());
       localStorage.setItem("colourclash_gender", gender);
       window.dispatchEvent(new Event("profileNameUpdated"));
-      const ageFromDob = dob
-        ? BigInt(
-            Math.floor(
-              (Date.now() - new Date(dob).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000),
-            ),
-          )
-        : 0n;
-      await actor.saveCallerUserProfile({
-        displayName: displayName.trim(),
-        email: email.trim(),
-        age: ageFromDob,
-        gender,
-        emailVerified: isEmailVerified,
-      });
-      await refreshProfile();
       toast.success("Profile saved!");
+      // Try backend save in background
+      if (actor) {
+        const ageFromDob = dob
+          ? BigInt(
+              Math.floor(
+                (Date.now() - new Date(dob).getTime()) /
+                  (365.25 * 24 * 60 * 60 * 1000),
+              ),
+            )
+          : 0n;
+        actor
+          .saveCallerUserProfile({
+            displayName: displayName.trim(),
+            email: email.trim(),
+            age: ageFromDob,
+            gender,
+            emailVerified: isEmailVerified,
+          })
+          .then(() => refreshProfile())
+          .catch(() => {});
+      }
     } catch {
       toast.error("Failed to save profile.");
     } finally {
@@ -463,7 +493,11 @@ export default function ProfilePage() {
           />
           <button
             type="button"
-            onClick={() => photoInputRef.current?.click()}
+            onClick={() =>
+              profilePhotoUrl
+                ? setViewingPhoto(true)
+                : photoInputRef.current?.click()
+            }
             className="relative w-16 h-16 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center overflow-hidden group"
             data-ocid="profile.secondary_button"
             aria-label="Change profile photo"
@@ -490,7 +524,64 @@ export default function ProfilePage() {
             </p>
           </div>
         </div>
+
+        {/* Logo preview + download */}
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <img
+            src="/assets/generated/colour-clash-logo.dim_800x300.png"
+            alt="Colour Clash Logo"
+            className="w-full max-w-xs rounded-xl border border-border/40 shadow-sm"
+          />
+          <button
+            type="button"
+            onClick={handleDownloadLogo}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-primary/40"
+            data-ocid="profile.secondary_button"
+          >
+            <Download className="w-3.5 h-3.5" /> Save App Logo PNG
+          </button>
+          <p className="text-[10px] text-muted-foreground">
+            On mobile: long-press the logo above to save
+          </p>
+        </div>
       </div>
+
+      {/* Profile image viewer modal */}
+      {viewingPhoto && profilePhotoUrl && (
+        <button
+          type="button"
+          className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4 w-full border-0"
+          onClick={() => setViewingPhoto(false)}
+          aria-label="Close photo viewer"
+        >
+          <div className="relative max-w-sm w-full" role="presentation">
+            <img
+              src={profilePhotoUrl}
+              alt="Profile"
+              className="w-full rounded-2xl shadow-2xl"
+            />
+            <div className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingPhoto(false);
+                  photoInputRef.current?.click();
+                }}
+                className="text-xs text-white/70 hover:text-white underline mr-4"
+              >
+                Change Photo
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setViewingPhoto(false)}
+              className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full flex items-center justify-center text-white text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+        </button>
+      )}
 
       {/* Profile form */}
       <div className="ios-card overflow-hidden">

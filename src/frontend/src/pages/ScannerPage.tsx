@@ -22,6 +22,7 @@ import type { HarmonyPalette } from "../backend.d";
 import { useUserProfile } from "../context/UserProfileContext";
 import { useAddFavorite, useGetHarmonyAdvice } from "../hooks/useQueries";
 import {
+  generateMatchingColors,
   getColorFamily,
   hexToColorName,
   hexToHsl,
@@ -316,8 +317,8 @@ const RETAILERS = [
   },
   {
     key: "indya" as const,
-    label: "Indya",
-    badge: "Indya",
+    label: "House of Indya",
+    badge: "House of Indya",
     badgeClass: "bg-rose-800 text-white",
     color: "#9B2335",
   },
@@ -416,26 +417,7 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
-function generateMatchingColors(hex: string): { hex: string; name: string }[] {
-  const [h, s, l] = hexToHsl(hex);
-  const sBase = Math.max(s, 0.18);
-  const swatches: string[] = [
-    hslToHex(h + 180, sBase, l),
-    hslToHex(h + 180, sBase * 0.75, l + (l < 0.5 ? 0.15 : -0.15)),
-    hslToHex(h + 15, sBase, l),
-    hslToHex(h - 15, sBase, l),
-    hslToHex(h + 30, sBase * 0.9, l + 0.05),
-    hslToHex(h + 120, sBase, l),
-    hslToHex(h + 240, sBase, l),
-    hslToHex(h + 150, sBase, l),
-    hslToHex(h + 210, sBase, l),
-    hslToHex(h + 90, sBase * 0.85, l),
-  ];
-  return swatches.map((swatchHex) => ({
-    hex: swatchHex,
-    name: hexToColorName(swatchHex),
-  }));
-}
+// generateMatchingColors imported from colorUtils
 
 // ── Outfit generation ──────────────────────────────────────────────────────
 interface OutfitSuggestion {

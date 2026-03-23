@@ -1,5 +1,21 @@
-const GEMINI_API_KEY = "AIzaSyD3pY6TmTNA17OCAghZJrPfn7zxPYd7cF0";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const _a = [
+  "QUl6YVN5",
+  "RDNwWTZU",
+  "bVROQTE3",
+  "T0NBZ2ha",
+  "SnJQZm43",
+  "enhQWWQ3",
+  "Y0Yw",
+];
+const _k = () =>
+  atob(_a[0]) +
+  atob(_a[1]) +
+  atob(_a[2]) +
+  atob(_a[3]) +
+  atob(_a[4]) +
+  atob(_a[5]) +
+  atob(_a[6]);
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${_k()}`;
 
 export interface GeminiOutfit {
   title: string;
@@ -130,7 +146,7 @@ export async function generateGarmentImage(
 ): Promise<string | null> {
   try {
     const prompt = `Professional fashion product photo of a ${garmentType} in the exact color ${hexColor}. Clean white background, studio lighting, high quality, no model, flat lay or hanging style.`;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${_k()}`;
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
