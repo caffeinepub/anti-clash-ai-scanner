@@ -270,7 +270,7 @@ export default function TrendRadarPage() {
                       {trend.description}
                     </p>
                     <p className="text-xs font-medium text-primary/70 mt-1">
-                      \ud83d\udc55 {trend.garments}
+                      👕 {trend.garments}
                     </p>
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export default function TrendRadarPage() {
                   className="mt-3 w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors"
                   data-ocid="trends.link"
                 >
-                  \ud83d\udecd\ufe0f Shop This Trend
+                  🛍️ Shop This Trend
                 </a>
               </CardContent>
             </Card>

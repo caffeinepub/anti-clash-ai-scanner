@@ -211,13 +211,16 @@ function SavedCard({
       : (item as any).name;
 
   const shareColors = async () => {
-    const text = `🎨 ${itemName} palette from Colour Clash:\n${complementary.map((c) => `${c.name} ${c.hex}`).join("\n")}`;
+    const count = complementary.length;
+    const extra =
+      count > 0 ? ` + ${count} matching shade${count !== 1 ? "s" : ""}` : "";
+    const text = `🎨 My Colour Clash palette: ${itemName}${extra}. Discover yours at Colour Clash! #ColourClash #FashionPalette`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "My Colour Palette", text });
+        await navigator.share({ title: "My Colour Clash Palette", text });
       } else {
         await navigator.clipboard.writeText(text);
-        toast.success("Palette copied!");
+        toast.success("Palette link copied!");
       }
     } catch (_) {}
   };

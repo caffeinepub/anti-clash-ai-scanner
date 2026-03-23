@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUserProfile } from "../context/UserProfileContext";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
@@ -12,7 +12,7 @@ function getGreeting(): string {
 
 export default function GreetingOverlay() {
   const [visible, setVisible] = useState(false);
-  const [hasShown, setHasShown] = useState(false);
+  const hasShownRef = useRef(false);
   const [isBirthday, setIsBirthday] = useState(false);
   const [turningAge, setTurningAge] = useState(0);
   const { userProfile } = useUserProfile();
@@ -38,12 +38,12 @@ export default function GreetingOverlay() {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || !firstName || hasShown) return;
+    if (!isLoggedIn || !firstName || hasShownRef.current) return;
+    hasShownRef.current = true;
     setVisible(true);
-    setHasShown(true);
     const timer = setTimeout(() => setVisible(false), 2500);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, firstName, hasShown]);
+  }, [isLoggedIn, firstName]);
 
   return (
     <AnimatePresence>

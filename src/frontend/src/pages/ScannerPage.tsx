@@ -355,11 +355,11 @@ function buildRetailerUrl(
     case "meesho":
       return `https://www.meesho.com/search?q=${q}`;
     case "nykaa":
-      return `https://www.nykaafashion.com/search/result/?q=${q}`;
+      return `https://www.nykaa.com/search/result/?q=${q}`;
     case "indya":
-      return `https://www.theindya.com/search?q=${q}`;
+      return `https://www.houseofindya.com/catalogsearch/result?q=${q}`;
     case "offduty":
-      return `https://www.offdutyindia.com/search?type=product&q=${q}`;
+      return `https://offduty.in/search?type=product&q=${q}`;
     default:
       return `https://www.amazon.in/s?k=${q}`;
   }
@@ -1440,6 +1440,42 @@ function ColorOfDayBanner() {
   );
 }
 
+// ── Color Psychology ──────────────────────────────────────────────────────
+function getColorPsychology(hex: string): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+  if (delta !== 0) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    hue = Math.round(hue * 60);
+    if (hue < 0) hue += 360;
+  }
+  const saturation = max === 0 ? 0 : delta / max;
+  if (saturation < 0.15)
+    return "Neutrals convey elegance and versatility — they pair with everything and let your accessories do the talking.";
+  if (hue < 20 || hue >= 345)
+    return "Red signals confidence and passion — a bold statement that commands attention and makes powerful first impressions.";
+  if (hue < 45)
+    return "Orange radiates warmth and creativity — it sparks conversation and shows an adventurous, energetic personality.";
+  if (hue < 70)
+    return "Yellow exudes optimism and positivity — it brightens any look and reflects an approachable, cheerful spirit.";
+  if (hue < 150)
+    return "Green evokes freshness and balance — grounding yet stylish, perfect for casual days and nature-inspired looks.";
+  if (hue < 195)
+    return "Teal blends calm with sophistication — a refined choice that feels both modern and effortlessly put-together.";
+  if (hue < 255)
+    return "Blue projects calm authority and trust — ideal for interviews, meetings, or any day you want to feel in control.";
+  if (hue < 290)
+    return "Purple carries an air of creativity and luxury — it signals originality and a flair for the finer things.";
+  return "Pink brings warmth and playfulness — it softens a look beautifully and radiates approachable confidence.";
+}
+
 export default function ScannerPage() {
   const [lockedColor, setLockedColor] = useState<string | null>(null);
   const [detectedColor, setDetectedColor] = useState<string>("#808080");
@@ -1459,7 +1495,6 @@ export default function ScannerPage() {
   const detectedColorRef = useRef<string>("#808080");
   const samplingCanvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startedRef = useRef(false);
 
   const { userProfile } = useUserProfile();
   const userGender = userProfile?.gender ?? "all";
@@ -1491,12 +1526,7 @@ export default function ScannerPage() {
     ? generateOutfits(activeColor, garment.label, userGender)
     : [];
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount only
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    startCamera();
-  }, []);
+  const [cameraStarted, setCameraStarted] = useState(false);
 
   useEffect(() => {
     detectedColorRef.current = detectedColor;
@@ -1666,6 +1696,28 @@ export default function ScannerPage() {
               <div className="reticle-ring animate-pulse" />
               <div className="reticle-dot" />
             </>
+          )}
+
+          {!cameraStarted && !isLoading && !isActive && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
+                <Camera className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-white/80 text-sm font-medium">
+                Tap to start scanning
+              </p>
+              <button
+                type="button"
+                data-ocid="scanner.primary_button"
+                onClick={() => {
+                  setCameraStarted(true);
+                  startCamera();
+                }}
+                className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
+              >
+                <Camera className="w-4 h-4" /> Start Scanner
+              </button>
+            </div>
           )}
 
           {isLoading && (
@@ -2012,6 +2064,24 @@ export default function ScannerPage() {
                   </div>
                 )}
               </div>
+
+              {/* Color Psychology Card */}
+              {lockedColor && (
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{
+                    background: "oklch(var(--muted) / 0.5)",
+                    borderLeft: `3px solid ${lockedColor}`,
+                  }}
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                    🧠 Color Psychology
+                  </p>
+                  <p className="text-xs text-foreground/80 italic leading-relaxed">
+                    {getColorPsychology(lockedColor)}
+                  </p>
+                </div>
+              )}
 
               <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
 

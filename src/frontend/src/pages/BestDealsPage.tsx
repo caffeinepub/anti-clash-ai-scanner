@@ -65,7 +65,7 @@ const RETAILERS = [
     color: "#FC2779",
     deal: "Fashion Festival",
     discount: "Up to 60% off on ethnic & western",
-    url: "https://www.nykaafashion.com/sale",
+    url: "https://www.nykaa.com/search/result/?q=sale+offers",
     bg: "bg-rose-50 dark:bg-rose-950/30",
     border: "border-rose-200 dark:border-rose-800",
   },
@@ -76,7 +76,7 @@ const RETAILERS = [
     color: "#9B2335",
     deal: "Ethnic Fiesta",
     discount: "Upto 40% off on kurtas & sarees",
-    url: "https://www.theindya.com/sale",
+    url: "https://www.houseofindya.com/sale",
     bg: "bg-rose-50 dark:bg-rose-950/20",
     border: "border-rose-300 dark:border-rose-900",
   },
@@ -87,7 +87,7 @@ const RETAILERS = [
     color: "#8B6914",
     deal: "Casuals Sale",
     discount: "Min 30% off on everyday wear",
-    url: "https://www.offdutyindia.com/sale",
+    url: "https://offduty.in/sale",
     bg: "bg-yellow-50 dark:bg-yellow-950/30",
     border: "border-yellow-200 dark:border-yellow-800",
   },
@@ -159,7 +159,8 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailerColor: "#9B2335",
     category: "Ethnic",
     searchQuery: "silk+banarasi+saree",
-    retailerUrl: "https://www.theindya.com/search?q=silk+banarasi+saree",
+    retailerUrl:
+      "https://www.houseofindya.com/catalogsearch/result?q=silk+banarasi+saree",
   },
   {
     emoji: "👟",
@@ -183,7 +184,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailerColor: "#FC2779",
     category: "Bags",
     searchQuery: "tote+handbag",
-    retailerUrl: "https://www.nykaafashion.com/search/result/?q=tote+handbag",
+    retailerUrl: "https://www.nykaa.com/search/result/?q=tote+handbag",
   },
   {
     emoji: "⌚",
@@ -243,7 +244,8 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailerColor: "#9B2335",
     category: "Ethnic",
     searchQuery: "cotton+anarkali+kurta",
-    retailerUrl: "https://www.theindya.com/search?q=cotton+anarkali+kurta",
+    retailerUrl:
+      "https://www.houseofindya.com/catalogsearch/result?q=cotton+anarkali+kurta",
   },
   {
     emoji: "👠",
@@ -255,8 +257,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailerColor: "#FC2779",
     category: "Footwear",
     searchQuery: "block+heel+sandals",
-    retailerUrl:
-      "https://www.nykaafashion.com/search/result/?q=block+heel+sandals",
+    retailerUrl: "https://www.nykaa.com/search/result/?q=block+heel+sandals",
   },
   {
     emoji: "🧣",
@@ -268,8 +269,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailerColor: "#8B6914",
     category: "Accessories",
     searchQuery: "cashmere+scarf",
-    retailerUrl:
-      "https://www.offdutyindia.com/search?type=product&q=cashmere+scarf",
+    retailerUrl: "https://offduty.in/search?type=product&q=cashmere+scarf",
   },
   {
     emoji: "👒",
@@ -548,6 +548,14 @@ export default function BestDealsPage() {
             8 stores
           </Badge>
         </div>
+        {/* Featured Sales Disclaimer */}
+        <div className="flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+          <span className="text-sm mt-0.5">ℹ️</span>
+          <p className="text-xs leading-relaxed">
+            These are official sale pages from each brand. Deals may vary — we
+            point you to the right place, the rest is fashion magic. ✨
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {RETAILERS.map((r, i) => (
             <motion.a
@@ -630,6 +638,15 @@ export default function BestDealsPage() {
           <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
             {filteredDeals.length} deals
           </Badge>
+        </div>
+        {/* Hot Picks Disclaimer */}
+        <div className="flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+          <span className="text-sm mt-0.5">ℹ️</span>
+          <p className="text-xs leading-relaxed">
+            We&apos;ve handpicked these for you — while we can&apos;t guarantee
+            every deal, most of these are spot on for your style. Happy
+            shopping! 💛
+          </p>
         </div>
         <AnimatePresence mode="wait">
           <motion.div

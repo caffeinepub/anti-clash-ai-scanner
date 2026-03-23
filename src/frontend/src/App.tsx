@@ -214,14 +214,8 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
   }, []);
 
   const isLoggedIn = identity && !identity.getPrincipal().isAnonymous();
-  const principalText = isLoggedIn ? identity.getPrincipal().toText() : null;
   const displayName = userProfile?.displayName
     ? userProfile.displayName.split(" ")[0]
-    : principalText
-      ? principalText.slice(0, 6).toUpperCase()
-      : null;
-  const truncatedPrincipal = principalText
-    ? `${principalText.slice(0, 14)}...`
     : null;
 
   if (isInitializing) {
@@ -318,9 +312,6 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
               {userProfile?.displayName || "Logged In"}
-            </p>
-            <p className="text-[11px] text-muted-foreground font-mono truncate">
-              {truncatedPrincipal}
             </p>
           </div>
         </div>

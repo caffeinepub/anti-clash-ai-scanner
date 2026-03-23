@@ -444,6 +444,7 @@ export default function OutfitScorePage({
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const isFromGalleryRef = useRef(false);
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [cropPhoto, setCropPhoto] = useState<string | null>(null);
@@ -484,8 +485,14 @@ export default function OutfitScorePage({
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
-      setCropPhoto(dataUrl);
-      setScore(null);
+      if (isFromGalleryRef.current) {
+        setCropPhoto(dataUrl);
+        setScore(null);
+      } else {
+        setPhoto(dataUrl);
+        setScore(null);
+        analyzeOutfit(dataUrl);
+      }
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -946,7 +953,10 @@ export default function OutfitScorePage({
                   <div className="flex gap-3 w-full max-w-xs">
                     <button
                       type="button"
-                      onClick={() => cameraInputRef.current?.click()}
+                      onClick={() => {
+                        isFromGalleryRef.current = false;
+                        cameraInputRef.current?.click();
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-3 text-sm font-semibold hover:opacity-90 transition-opacity"
                       data-ocid="outfit.primary_button"
                     >
@@ -954,7 +964,10 @@ export default function OutfitScorePage({
                     </button>
                     <button
                       type="button"
-                      onClick={() => galleryInputRef.current?.click()}
+                      onClick={() => {
+                        isFromGalleryRef.current = true;
+                        galleryInputRef.current?.click();
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 text-primary py-3 text-sm font-semibold hover:bg-primary/10 transition-colors"
                       data-ocid="outfit.upload_button"
                     >
