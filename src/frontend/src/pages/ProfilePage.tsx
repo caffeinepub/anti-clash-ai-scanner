@@ -322,9 +322,34 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (userProfile) {
-      setDisplayName(userProfile.displayName);
-      setEmail(userProfile.email);
-      setGender((userProfile.gender as "men" | "women" | "all") || "all");
+      setDisplayName(
+        userProfile.displayName ||
+          localStorage.getItem("colourclash_displayName") ||
+          "",
+      );
+      setEmail(
+        userProfile.email || localStorage.getItem("colourclash_email") || "",
+      );
+      setGender(
+        (userProfile.gender as "men" | "women" | "all") ||
+          (localStorage.getItem("colourclash_gender") as
+            | "men"
+            | "women"
+            | "all") ||
+          "all",
+      );
+    } else {
+      // Fallback: populate from localStorage when backend hasn't loaded yet
+      const savedName = localStorage.getItem("colourclash_displayName") || "";
+      const savedEmail = localStorage.getItem("colourclash_email") || "";
+      const savedGender =
+        (localStorage.getItem("colourclash_gender") as
+          | "men"
+          | "women"
+          | "all") || "all";
+      if (savedName) setDisplayName(savedName);
+      if (savedEmail) setEmail(savedEmail);
+      setGender(savedGender);
     }
     const savedDob = localStorage.getItem("colourclash_dob") || "";
     if (savedDob) setDob(savedDob);
@@ -346,6 +371,11 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
       localStorage.setItem("colourclash_dob", dob);
+      // Persist to localStorage immediately so UI updates across the app
+      localStorage.setItem("colourclash_displayName", displayName.trim());
+      localStorage.setItem("colourclash_email", email.trim());
+      localStorage.setItem("colourclash_gender", gender);
+      window.dispatchEvent(new Event("profileNameUpdated"));
       const ageFromDob = dob
         ? BigInt(
             Math.floor(
@@ -487,6 +517,7 @@ export default function ProfilePage() {
                     "colourclash_displayName",
                     e.target.value.trim(),
                   );
+                  window.dispatchEvent(new Event("profileNameUpdated"));
                 }
               }}
               placeholder="e.g. Rahul Sharma"

@@ -137,7 +137,7 @@ function LoginWelcomeModal({
                 </h2>
                 <p className="text-sm text-muted-foreground">
                   Sign up / Sign in to unlock personalized fashion advice,
-                  colour scanning & your style profile.
+                  colour scanning &amp; your style profile.
                 </p>
               </div>
 
@@ -184,6 +184,9 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
     localStorage.getItem("profilePhotoUrl"),
   );
   const [streak, setStreak] = useState(1);
+  const [localDisplayName, setLocalDisplayName] = useState(
+    () => localStorage.getItem("colourclash_displayName") || "",
+  );
 
   useEffect(() => {
     const today = new Date().toDateString();
@@ -213,10 +216,22 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
     return () => window.removeEventListener("profilePhotoUpdated", handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () =>
+      setLocalDisplayName(
+        localStorage.getItem("colourclash_displayName") || "",
+      );
+    window.addEventListener("profileNameUpdated", handler);
+    return () => window.removeEventListener("profileNameUpdated", handler);
+  }, []);
+
   const isLoggedIn = identity && !identity.getPrincipal().isAnonymous();
-  const displayName = userProfile?.displayName
+
+  const resolvedDisplayName = userProfile?.displayName
     ? userProfile.displayName.split(" ")[0]
-    : null;
+    : localDisplayName
+      ? localDisplayName.split(" ")[0]
+      : null;
 
   if (isInitializing) {
     return <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />;
@@ -283,9 +298,11 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
               </span>
             )}
           </div>
-          <span className="text-[9px] font-semibold text-primary">
-            {displayName}
-          </span>
+          {resolvedDisplayName && (
+            <span className="text-[9px] font-semibold text-primary">
+              {resolvedDisplayName}
+            </span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -311,7 +328,7 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
-              {userProfile?.displayName || "Logged In"}
+              {userProfile?.displayName || localDisplayName || "Logged In"}
             </p>
           </div>
         </div>
