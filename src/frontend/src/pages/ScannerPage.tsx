@@ -775,7 +775,7 @@ function ProductCard({
       </div>
       <div className="p-2.5">
         <p className="text-xs font-semibold text-foreground leading-tight mb-2 line-clamp-2">
-          {product.name}
+          {colorName} {product.garmentLabel}
         </p>
         <div className="flex flex-wrap gap-1">
           {availableRetailers.map((retailer) => (
@@ -884,7 +884,7 @@ function ShopMatchingStyles({
             >
               {section.products.map((product, pi) => (
                 <ProductCard
-                  key={`${product.garmentLabel}-${product.name}-${shopColor.hex}`}
+                  key={`${product.garmentLabel}-${pi}-${shopColor.hex}`}
                   product={product}
                   colorHex={shopColor.hex}
                   colorName={shopColor.name}
@@ -1024,7 +1024,7 @@ function ShopMatchingStyles({
                       >
                         {section.products.slice(0, 3).map((product, pi) => (
                           <motion.div
-                            key={`${product.garmentLabel}-${product.name}`}
+                            key={`${product.garmentLabel}-${pi}`}
                             className="ios-card overflow-hidden flex-shrink-0"
                             style={{ width: 150 }}
                             initial={{ opacity: 0, x: 20 }}
@@ -1057,7 +1057,7 @@ function ShopMatchingStyles({
                             </div>
                             <div className="p-2.5">
                               <p className="text-xs font-semibold text-foreground leading-tight mb-2 line-clamp-2">
-                                {product.name}
+                                {shopColor.name} {product.garmentLabel}
                               </p>
                               <a
                                 href={buildRetailerUrl(

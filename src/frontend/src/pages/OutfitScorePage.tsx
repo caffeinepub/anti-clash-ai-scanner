@@ -530,53 +530,75 @@ function CoupleResultCard({
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 1080, 1350);
 
-        // Person 1 color block (left)
-        ctx.fillStyle = person1Color;
-        ctx.fillRect(0, 100, 480, 700);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 100, 480, 700);
+        // Draw actual photo
+        const img = new Image();
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = photo;
+        });
+        const imgH = 900;
+        ctx.drawImage(img, 0, 0, 1080, imgH);
 
-        // Person 2 color block (right)
-        ctx.fillStyle = person2Color;
-        ctx.fillRect(540, 100, 540, 700);
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(540, 100, 540, 700);
+        // Semi-transparent overlay for readability
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillRect(0, 0, 1080, imgH);
 
-        // Person labels
-        ctx.font = "bold 36px system-ui";
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.textAlign = "center";
-        ctx.fillText("👤 Person 1", 240, 470);
-        ctx.fillText("👤 Person 2", 810, 470);
+        // Person 1 bounding box (left half) — blue dashed
+        ctx.save();
+        ctx.setLineDash([16, 8]);
+        ctx.strokeStyle = "#60A5FA";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(30, 50, 480, 820);
+        ctx.restore();
 
-        // Color name labels
-        ctx.font = "28px system-ui";
-        ctx.fillText(person1Color.toUpperCase(), 240, 520);
-        ctx.fillText(person2Color.toUpperCase(), 810, 520);
+        // Person 1 label badge
+        ctx.fillStyle = "rgba(96,165,250,0.85)";
+        ctx.fillRect(38, 58, 160, 32);
+        ctx.font = "bold 18px system-ui";
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "left";
+        ctx.fillText(`P1 • ${person1Desc}`, 50, 80);
 
-        // Score badge
+        // Person 2 bounding box (right half) — pink dashed
+        ctx.save();
+        ctx.setLineDash([16, 8]);
+        ctx.strokeStyle = "#F472B6";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(570, 50, 480, 820);
+        ctx.restore();
+
+        // Person 2 label badge
+        ctx.fillStyle = "rgba(244,114,182,0.85)";
+        ctx.fillRect(578, 58, 160, 32);
+        ctx.font = "bold 18px system-ui";
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "left";
+        ctx.fillText(`P2 • ${person2Desc}`, 590, 80);
+
+        // Score circle (bottom right of photo)
         ctx.beginPath();
-        ctx.arc(540, 900, 90, 0, Math.PI * 2);
+        ctx.arc(980, 870, 70, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
-        ctx.font = "bold 60px system-ui";
+        ctx.font = "bold 52px system-ui";
         ctx.fillStyle = "#fff";
         ctx.textAlign = "center";
-        ctx.fillText(String(harmony.score), 540, 915);
-        ctx.font = "26px system-ui";
-        ctx.fillText("/100", 540, 950);
+        ctx.fillText(String(harmony.score), 980, 882);
+        ctx.font = "24px system-ui";
+        ctx.fillText("/100", 980, 912);
 
         // Harmony tier label
         ctx.font = "bold 34px system-ui";
         ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.fillText(tierLabels[harmony.tier], 540, 1030);
+        ctx.fillText(tierLabels[harmony.tier], 540, 970);
 
         // Advice text (wrapped)
         ctx.font = "italic 26px system-ui";
         ctx.fillStyle = "rgba(255,255,255,0.65)";
         const adviceWords = harmony.advice.split(" ");
         let line = "";
-        let y = 1085;
+        let y = 1020;
         for (const word of adviceWords) {
           const testLine = `${line}${word} `;
           if (ctx.measureText(testLine).width > 980 && line) {
@@ -963,7 +985,6 @@ export default function OutfitScorePage({
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const isFromGalleryRef = useRef(false);
 
   const [mode, setMode] = useState<ScoreMode>("single");
   const [pageState, setPageState] = useState<ScorePageState>("idle");
@@ -1112,6 +1133,22 @@ export default function OutfitScorePage({
         person1Desc: colors.person1Description,
         person2Desc: colors.person2Description,
       });
+      const harmonyResult = getCoupleHarmonyScore(
+        colors.person1Color,
+        colors.person2Color,
+      );
+      const coupleEntry: OutfitScoreResult = {
+        score: harmonyResult.score,
+        colorScore: Math.round(harmonyResult.score * 0.4),
+        fitScore: Math.round(harmonyResult.score * 0.3),
+        styleScore:
+          harmonyResult.score -
+          Math.round(harmonyResult.score * 0.4) -
+          Math.round(harmonyResult.score * 0.3),
+        analysis: `Couple harmony: ${harmonyResult.tier} — ${colors.person1Description} & ${colors.person2Description}`,
+        suggestion: harmonyResult.advice,
+      };
+      saveEntry(coupleEntry, dataUrl);
       setPageState("results");
     } catch (err) {
       console.error(err);
@@ -1121,26 +1158,51 @@ export default function OutfitScorePage({
         person1Desc: "Blue",
         person2Desc: "Amber",
       });
+      const fallbackHarmony = getCoupleHarmonyScore("#3B82F6", "#F59E0B");
+      const fallbackEntry: OutfitScoreResult = {
+        score: fallbackHarmony.score,
+        colorScore: Math.round(fallbackHarmony.score * 0.4),
+        fitScore: Math.round(fallbackHarmony.score * 0.3),
+        styleScore:
+          fallbackHarmony.score -
+          Math.round(fallbackHarmony.score * 0.4) -
+          Math.round(fallbackHarmony.score * 0.3),
+        analysis: "Couple harmony analysis (estimated)",
+        suggestion: fallbackHarmony.advice,
+      };
+      saveEntry(fallbackEntry, dataUrl);
       setPageState("results");
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
-      if (isFromGalleryRef.current) {
+      if (mode === "single") {
+        analyzeSingle(dataUrl);
+      } else {
+        analyzeCouple(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleGalleryChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setTimeout(() => {
         setCropPhoto(dataUrl);
         setPageState("hasPhoto");
-      } else {
-        if (mode === "single") {
-          analyzeSingle(dataUrl);
-        } else {
-          analyzeCouple(dataUrl);
-        }
-      }
+      }, 50);
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -1356,14 +1418,14 @@ export default function OutfitScorePage({
             accept="image/*"
             capture="environment"
             className="hidden"
-            onChange={handleFileChange}
+            onChange={handleCameraChange}
           />
           <input
             ref={galleryInputRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handleFileChange}
+            onChange={handleGalleryChange}
             data-ocid="outfit.upload_button"
           />
 
@@ -1574,8 +1636,9 @@ export default function OutfitScorePage({
                     <button
                       type="button"
                       onClick={() => {
-                        isFromGalleryRef.current = false;
-                        cameraInputRef.current?.click();
+                        if (cameraInputRef.current) {
+                          cameraInputRef.current.click();
+                        }
                       }}
                       className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-3 text-sm font-semibold"
                       data-ocid="outfit.primary_button"
@@ -1585,8 +1648,9 @@ export default function OutfitScorePage({
                     <button
                       type="button"
                       onClick={() => {
-                        isFromGalleryRef.current = true;
-                        galleryInputRef.current?.click();
+                        if (galleryInputRef.current) {
+                          galleryInputRef.current.click();
+                        }
                       }}
                       className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 text-primary py-3 text-sm font-semibold"
                       data-ocid="outfit.upload_button"
