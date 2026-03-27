@@ -140,6 +140,87 @@ function saveLocalPalettes(key: string, palettes: LocalPalette[]) {
   localStorage.setItem(key, JSON.stringify(palettes));
 }
 
+// ── Couple Combination Presets ────────────────────────────────────────────
+const COUPLE_COMBINATIONS = [
+  {
+    id: 1,
+    label: "Classic Romance",
+    his: { hex: "#1a1a2e", name: "Midnight Navy" },
+    hers: { hex: "#c9a0dc", name: "Lavender Mist" },
+    occasions: ["date night", "anniversary", "dinner", "evening"],
+  },
+  {
+    id: 2,
+    label: "Beach Bliss",
+    his: { hex: "#0077b6", name: "Ocean Blue" },
+    hers: { hex: "#f4d58d", name: "Sandy Beige" },
+    occasions: ["beach", "vacation", "outdoor", "travel", "holiday"],
+  },
+  {
+    id: 3,
+    label: "Wedding Harmony",
+    his: { hex: "#2c3e50", name: "Charcoal" },
+    hers: { hex: "#f5e6d3", name: "Champagne" },
+    occasions: ["wedding", "formal", "reception", "ceremony"],
+  },
+  {
+    id: 4,
+    label: "Festival Glow",
+    his: { hex: "#e63946", name: "Vibrant Red" },
+    hers: { hex: "#f9c74f", name: "Golden Yellow" },
+    occasions: [
+      "festival",
+      "celebration",
+      "party",
+      "cultural",
+      "diwali",
+      "holi",
+    ],
+  },
+  {
+    id: 5,
+    label: "Earthy Harmony",
+    his: { hex: "#6b4226", name: "Warm Brown" },
+    hers: { hex: "#a8d5ba", name: "Sage Green" },
+    occasions: ["outdoor", "picnic", "brunch", "casual", "travel"],
+  },
+  {
+    id: 6,
+    label: "Monochrome Elite",
+    his: { hex: "#2d2d2d", name: "Jet Black" },
+    hers: { hex: "#e8e8e8", name: "Soft White" },
+    occasions: ["office", "corporate", "formal", "business", "gala"],
+  },
+  {
+    id: 7,
+    label: "Pastel Dreams",
+    his: { hex: "#aec6cf", name: "Baby Blue" },
+    hers: { hex: "#ffb7c5", name: "Blush Pink" },
+    occasions: ["brunch", "spring", "garden", "birthday", "casual"],
+  },
+  {
+    id: 8,
+    label: "Jewel Tones",
+    his: { hex: "#2e4057", name: "Deep Teal" },
+    hers: { hex: "#9b2226", name: "Burgundy" },
+    occasions: ["gala", "wedding", "anniversary", "formal", "theatre"],
+  },
+  {
+    id: 9,
+    label: "Sunset Vibes",
+    his: { hex: "#e76f51", name: "Terracotta" },
+    hers: { hex: "#ffd166", name: "Warm Amber" },
+    occasions: ["sunset", "rooftop", "dinner", "date", "summer"],
+  },
+  {
+    id: 10,
+    label: "Ethnic Festive",
+    his: { hex: "#800020", name: "Deep Maroon" },
+    hers: { hex: "#d4af37", name: "Royal Gold" },
+    occasions: ["wedding", "puja", "ethnic", "diwali", "sangeet", "reception"],
+  },
+];
+
 // ── Notebook theme styles ──────────────────────────────────────────────────
 const notebook = {
   page: {
@@ -411,6 +492,7 @@ export default function FavoritesPage(_props?: {
   const [isSaving, setIsSaving] = useState(false);
 
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+  const [coupleOccasion, setCoupleOccasion] = useState("");
 
   const todayTip = STYLE_TIPS[new Date().getDate() % STYLE_TIPS.length];
 
@@ -943,6 +1025,193 @@ export default function FavoritesPage(_props?: {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+
+        {/* ── Couple Match ── */}
+        <div style={notebook.marginLine} className="mb-4 mt-2">
+          <h2 className="text-base font-semibold mb-3" style={notebook.heading}>
+            💑 Couple Match
+          </h2>
+          <div
+            className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2"
+            style={{ background: "#f0e8d8", border: "1.5px solid #d4b896" }}
+          >
+            <span className="text-sm">🔍</span>
+            <input
+              type="text"
+              value={coupleOccasion}
+              onChange={(e) => setCoupleOccasion(e.target.value)}
+              placeholder="Type an occasion (e.g. wedding, beach, party)..."
+              className="flex-1 bg-transparent text-sm outline-none"
+              style={{ color: "#5c3d1e", fontFamily: "Georgia, serif" }}
+              data-ocid="favorites.input"
+            />
+            {coupleOccasion && (
+              <button
+                type="button"
+                onClick={() => setCoupleOccasion("")}
+                className="text-xs text-muted-foreground hover:text-foreground"
+                data-ocid="favorites.close_button"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {(() => {
+            const filtered = coupleOccasion.trim()
+              ? COUPLE_COMBINATIONS.filter((c) =>
+                  c.occasions.some((o) =>
+                    o.toLowerCase().includes(coupleOccasion.toLowerCase()),
+                  ),
+                )
+              : COUPLE_COMBINATIONS;
+            if (filtered.length === 0) {
+              return (
+                <p
+                  className="text-sm text-center py-4"
+                  style={{
+                    color: "#9c7a58",
+                    fontFamily: "Georgia, serif",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No combinations found for this occasion. Try: wedding, beach,
+                  party, office...
+                </p>
+              );
+            }
+            return (
+              <div className="flex flex-col gap-3">
+                {filtered.map((combo) => (
+                  <motion.div
+                    key={combo.id}
+                    whileTap={{ scale: 0.97 }}
+                    className="rounded-xl p-3"
+                    style={{
+                      background: "#fef9f0",
+                      border: "1.5px solid #d4b896",
+                      boxShadow: "0 2px 8px rgba(160,100,60,0.08)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span
+                        className="text-sm font-semibold"
+                        style={{
+                          fontFamily: "Georgia, serif",
+                          color: "#5c3d1e",
+                        }}
+                      >
+                        {combo.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await addFavorite.mutateAsync({
+                              hex: combo.his.hex,
+                              name: combo.his.name,
+                              harmonyPalette: combo.his.hex,
+                            });
+                            await addFavorite.mutateAsync({
+                              hex: combo.hers.hex,
+                              name: combo.hers.name,
+                              harmonyPalette: combo.hers.hex,
+                            });
+                            toast.success(
+                              `💑 "${combo.label}" saved to favourites!`,
+                            );
+                          } catch {
+                            // Save to localStorage as fallback
+                            const key = `favPalettes_${principalText}`;
+                            const existing = JSON.parse(
+                              localStorage.getItem(key) || "[]",
+                            );
+                            existing.push({
+                              id: Date.now(),
+                              colorHex: combo.his.hex,
+                              colorName: combo.his.name,
+                            });
+                            existing.push({
+                              id: Date.now() + 1,
+                              colorHex: combo.hers.hex,
+                              colorName: combo.hers.name,
+                            });
+                            localStorage.setItem(key, JSON.stringify(existing));
+                            toast.success(`💑 "${combo.label}" saved!`);
+                          }
+                        }}
+                        className="text-[11px] font-semibold px-3 py-1 rounded-full transition-all"
+                        style={{ background: notebook.accent, color: "#fff" }}
+                        data-ocid="favorites.save_button"
+                      >
+                        Save Pair
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="flex flex-col items-center gap-1">
+                        <div
+                          className="w-12 h-12 rounded-full border-2 shadow-md"
+                          style={{
+                            background: combo.his.hex,
+                            borderColor: "#d4b896",
+                          }}
+                        />
+                        <span
+                          className="text-[10px] font-semibold"
+                          style={{ color: "#5c3d1e" }}
+                        >
+                          His
+                        </span>
+                        <span
+                          className="text-[9px]"
+                          style={{ color: "#9c7a58" }}
+                        >
+                          {combo.his.name}
+                        </span>
+                      </div>
+                      <span className="text-xl">💑</span>
+                      <div className="flex flex-col items-center gap-1">
+                        <div
+                          className="w-12 h-12 rounded-full border-2 shadow-md"
+                          style={{
+                            background: combo.hers.hex,
+                            borderColor: "#d4b896",
+                          }}
+                        />
+                        <span
+                          className="text-[10px] font-semibold"
+                          style={{ color: "#5c3d1e" }}
+                        >
+                          Hers
+                        </span>
+                        <span
+                          className="text-[9px]"
+                          style={{ color: "#9c7a58" }}
+                        >
+                          {combo.hers.name}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {combo.occasions.map((o) => (
+                        <span
+                          key={o}
+                          className="text-[9px] px-2 py-0.5 rounded-full capitalize"
+                          style={{
+                            background: "#f0e8d8",
+                            color: "#8a6040",
+                            border: "1px solid #d4b896",
+                          }}
+                        >
+                          {o}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Saved palettes ── */}

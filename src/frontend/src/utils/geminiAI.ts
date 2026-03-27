@@ -172,7 +172,6 @@ export async function generateGarmentImage(
 
 /**
  * Detect if there is a human person visible in the image.
- * Returns 'YES', 'NO', or throws on error.
  */
 export async function detectHuman(
   imageBase64: string,
@@ -196,20 +195,19 @@ export async function detectHuman(
         generationConfig: { temperature: 0, maxOutputTokens: 5 },
       }),
     });
-    if (!res.ok) return "YES"; // default allow on error
+    if (!res.ok) return "YES";
     const data = await res.json();
     const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
       .trim()
       .toUpperCase();
     return text.startsWith("YES") ? "YES" : "NO";
   } catch {
-    return "YES"; // default allow on error
+    return "YES";
   }
 }
 
 /**
  * Detect how many people are in a couple photo.
- * Returns 'YES_TWO', 'YES_ONE', or 'NO'.
  */
 export async function detectCoupleInPhoto(
   imageBase64: string,
@@ -289,7 +287,6 @@ export async function extractCoupleColors(
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const json = extractJson(raw);
     const parsed = JSON.parse(json) as CoupleColors;
-    // Validate hex codes
     if (!/^#[0-9a-fA-F]{6}$/.test(parsed.person1Color))
       parsed.person1Color = fallback.person1Color;
     if (!/^#[0-9a-fA-F]{6}$/.test(parsed.person2Color))
@@ -347,7 +344,6 @@ export async function analyzeOutfitScore(
     const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const json = extractJson(raw);
     const parsed = JSON.parse(json) as OutfitScoreResult;
-    // Validate
     if (
       typeof parsed.score !== "number" ||
       parsed.score < 0 ||
@@ -357,5 +353,44 @@ export async function analyzeOutfitScore(
     return parsed;
   } catch {
     return fallback;
+  }
+}
+
+/**
+ * Detect the person's skin tone from the image.
+ */
+export async function detectSkinTone(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<"fair" | "wheatish" | "medium" | "dark"> {
+  try {
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: "Look at the person's skin in this image. Classify their skin tone as one of: fair, wheatish, medium, dark. Reply with ONLY one word.",
+              },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0, maxOutputTokens: 5 },
+      }),
+    });
+    if (!res.ok) return "medium";
+    const data = await res.json();
+    const t = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+      .trim()
+      .toLowerCase();
+    if (t.includes("fair")) return "fair";
+    if (t.includes("wheat")) return "wheatish";
+    if (t.includes("dark")) return "dark";
+    return "medium";
+  } catch {
+    return "medium";
   }
 }

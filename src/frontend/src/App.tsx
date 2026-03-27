@@ -539,14 +539,16 @@ function AppContent() {
         </div>
       </nav>
 
-      {/* Full-page Profile Slide-in */}
+      {/* Full-screen Profile Takeover */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 60,
-          transform: showProfile ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          zIndex: 70,
+          opacity: showProfile ? 1 : 0,
+          pointerEvents: showProfile ? "auto" : "none",
+          transform: showProfile ? "scale(1)" : "scale(0.97)",
+          transition: "opacity 0.25s ease, transform 0.25s ease",
           background: "oklch(var(--background))",
           overflowY: "auto",
         }}

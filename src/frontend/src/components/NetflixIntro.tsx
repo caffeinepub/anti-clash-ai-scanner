@@ -8,11 +8,8 @@ export default function NetflixIntro({ onComplete }: NetflixIntroProps) {
   const [phase, setPhase] = useState<"zoom" | "hold" | "fadeout">("zoom");
 
   useEffect(() => {
-    // zoom: 0 - 1800ms
     const t1 = setTimeout(() => setPhase("hold"), 1800);
-    // hold: 1800 - 2300ms
     const t2 = setTimeout(() => setPhase("fadeout"), 2300);
-    // fadeout: 2300 - 2800ms -> complete
     const t3 = setTimeout(() => onComplete(), 2800);
     return () => {
       clearTimeout(t1);
@@ -54,6 +51,29 @@ export default function NetflixIntro({ onComplete }: NetflixIntroProps) {
         }
       `}</style>
       <div className="cc-intro-logo" style={{ textAlign: "center" }}>
+        {/* 4-circle icon */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 12,
+          }}
+        >
+          <svg
+            width="64"
+            height="64"
+            viewBox="0 0 28 28"
+            fill="none"
+            aria-label="Colour Clash icon"
+            role="img"
+          >
+            <circle cx="10" cy="10" r="4" fill="#FF6B6B" />
+            <circle cx="18" cy="10" r="4" fill="#818CF8" />
+            <circle cx="10" cy="18" r="4" fill="#34D399" />
+            <circle cx="18" cy="18" r="4" fill="#FBBF24" />
+            <circle cx="14" cy="14" r="3" fill="rgba(255,255,255,0.15)" />
+          </svg>
+        </div>
         {/* CC mark */}
         <div
           style={{

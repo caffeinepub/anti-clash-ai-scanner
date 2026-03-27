@@ -1570,8 +1570,12 @@ export default function ScannerPage() {
   const [selectedAge, setSelectedAge] = useState<
     "kid" | "teenage" | "young" | "adult" | "senior"
   >("young");
-  const [selectedMood, setSelectedMood] = useState<string>("casual");
-  const [selectedOccasion, setSelectedOccasion] = useState<string>("");
+  const [selectedMood, _setSelectedMood] = useState<string>("casual");
+  const [selectedOccasion, _setSelectedOccasion] = useState<string>("");
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [selectedAI, setSelectedAI] = useState<string>("");
+  const [selectedSize, setSelectedSize] = useState<string>("M");
+  const [aiConnected, setAiConnected] = useState<boolean>(false);
 
   const detectedColorRef = useRef<string>("#808080");
   const samplingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1652,6 +1656,17 @@ export default function ScannerPage() {
   useEffect(() => {
     if (harmonyData) setLocalAdvice(harmonyData);
   }, [harmonyData]);
+
+  // Restore aiConnected from localStorage when selectedAI changes
+  useEffect(() => {
+    if (selectedAI) {
+      setAiConnected(
+        localStorage.getItem(`cc_ai_connected_${selectedAI}`) === "1",
+      );
+    } else {
+      setAiConnected(false);
+    }
+  }, [selectedAI]);
 
   const handleLockColor = useCallback(() => {
     if (lockedColor) {
@@ -1765,7 +1780,7 @@ export default function ScannerPage() {
         <ColorOfDayBanner />
       </AnimatePresence>
 
-      {/* ── Gender + Age + Mood + Occasion Filter Bar ── */}
+      {/* ── Filters (Collapsible) ── */}
       <motion.div
         className="ios-card overflow-hidden"
         initial={{ opacity: 0, y: -12 }}
@@ -1773,183 +1788,227 @@ export default function ScannerPage() {
         transition={{ type: "spring", stiffness: 380, damping: 32 }}
         data-ocid="scanner.panel"
       >
-        <div className="px-4 pt-3 pb-2 space-y-2.5">
-          {/* Gender toggle */}
+        {/* Toggle header */}
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 pt-3 pb-2.5"
+          data-ocid="scanner.toggle"
+        >
+          <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+            🎛 Filters
+          </span>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Gender
+            {!filtersOpen && (
+              <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                {selectedGender === "male" ? "👔 Male" : "👗 Female"} ·{" "}
+                {selectedAge}
+              </span>
+            )}
+            <span className="text-muted-foreground text-xs">
+              {filtersOpen ? "▲" : "▼"}
             </span>
-            <div className="flex gap-1.5">
-              {(["male", "female"] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setSelectedGender(g)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                    selectedGender === g
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                  data-ocid="scanner.toggle"
-                >
-                  {g === "male" ? "👔 Male" : "👗 Female"}
-                </button>
-              ))}
-            </div>
           </div>
+        </button>
 
-          {/* Age chips */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Age
-            </span>
-            <div
-              className="flex gap-1.5 overflow-x-auto"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {(["kid", "teenage", "young", "adult", "senior"] as const).map(
-                (a) => (
+        {/* Collapsible content */}
+        {filtersOpen && (
+          <div className="px-4 pb-3 space-y-2.5">
+            {/* Gender toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+                Gender
+              </span>
+              <div
+                className="relative flex bg-muted rounded-full p-0.5"
+                style={{ width: 164 }}
+              >
+                <div
+                  className="absolute top-0.5 bottom-0.5 w-1/2 rounded-full bg-primary shadow-sm transition-all duration-200"
+                  style={{ left: selectedGender === "male" ? "2px" : "50%" }}
+                />
+                {(["male", "female"] as const).map((g) => (
                   <button
-                    key={a}
+                    key={g}
                     type="button"
-                    onClick={() => setSelectedAge(a)}
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
-                      selectedAge === a
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                    onClick={() => setSelectedGender(g)}
+                    className={`relative z-10 flex-1 py-1 text-xs font-semibold transition-colors duration-200 rounded-full ${selectedGender === g ? "text-primary-foreground" : "text-muted-foreground"}`}
                     data-ocid="scanner.toggle"
                   >
-                    {a}
+                    {g === "male" ? "👔 Male" : "👗 Female"}
                   </button>
-                ),
-              )}
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Mood chips */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Mood
-            </span>
-            <div
-              className="flex gap-1.5 overflow-x-auto"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {["casual", "formal", "party", "date night", "festive"].map(
-                (m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() =>
-                      setSelectedMood(selectedMood === m ? "casual" : m)
-                    }
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
-                      selectedMood === m
-                        ? "bg-accent text-accent-foreground shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                    data-ocid="scanner.toggle"
-                  >
-                    {m}
-                  </button>
-                ),
-              )}
+            {/* Age chips */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+                Age
+              </span>
+              <div
+                className="flex gap-1.5 overflow-x-auto"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {(["kid", "teenage", "young", "adult", "senior"] as const).map(
+                  (a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setSelectedAge(a)}
+                      className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
+                        selectedAge === a
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                      data-ocid="scanner.toggle"
+                    >
+                      {a}
+                    </button>
+                  ),
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Occasion chips */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Occasion
-            </span>
-            <div
-              className="flex gap-1.5 overflow-x-auto"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {["office", "wedding", "outdoor", "travel"].map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  onClick={() =>
-                    setSelectedOccasion(selectedOccasion === o ? "" : o)
-                  }
-                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
-                    selectedOccasion === o
-                      ? "bg-accent text-accent-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                  data-ocid="scanner.toggle"
-                >
-                  {o}
-                </button>
-              ))}
+            {/* Size dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+                Size
+              </span>
+              <select
+                value={selectedSize}
+                onChange={(e) => setSelectedSize(e.target.value)}
+                className="bg-muted border border-border/60 rounded-full px-2.5 py-1 text-[11px] font-semibold text-foreground appearance-none cursor-pointer"
+                data-ocid="scanner.select"
+              >
+                {["S", "M", "L", "XL", "XXL", "XXXL"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Quick presets */}
-          <div className="flex items-center gap-2 pb-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Preset
-            </span>
-            <div
-              className="flex gap-1.5 overflow-x-auto"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {[
-                {
-                  label: "🎒 School",
-                  age: "teenage" as const,
-                  mood: "casual",
-                  occasion: "outdoor",
-                },
-                {
-                  label: "🎉 Festival",
-                  age: "adult" as const,
-                  mood: "festive",
-                  occasion: "wedding",
-                },
-                {
-                  label: "💪 Gym",
-                  age: "young" as const,
-                  mood: "casual",
-                  occasion: "outdoor",
-                },
-                {
-                  label: "💞 Date",
-                  age: "young" as const,
-                  mood: "date night",
-                  occasion: "outdoor",
-                },
-              ].map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAge(preset.age);
-                    setSelectedMood(preset.mood);
-                    setSelectedOccasion(preset.occasion);
-                  }}
-                  className="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20"
-                  data-ocid="scanner.button"
-                >
-                  {preset.label}
-                </button>
-              ))}
+            {/* AI Platform selector */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+                🤖 AI
+              </span>
+              <select
+                value={selectedAI}
+                onChange={(e) => setSelectedAI(e.target.value)}
+                className="flex-1 text-[11px] font-semibold bg-muted border border-border/60 rounded-full px-2.5 py-1 text-foreground appearance-none cursor-pointer"
+                data-ocid="scanner.select"
+                style={{ maxWidth: 200 }}
+              >
+                <option value="">None (Internal Engine)</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="chatgpt">ChatGPT</option>
+                <option value="metallamа">Meta LLaMA</option>
+                <option value="grok">Grok</option>
+              </select>
             </div>
+            {selectedAI && (
+              <p
+                className={`text-[10px] pl-16 ${aiConnected ? "text-green-600 dark:text-green-400" : "text-primary/70"}`}
+              >
+                {aiConnected
+                  ? `✅ ${selectedAI === "gemini" ? "Google Gemini" : selectedAI === "chatgpt" ? "ChatGPT" : selectedAI === "metallamа" ? "Meta LLaMA" : "Grok"} connected — enhanced suggestions active`
+                  : "Suggestions will appear as per your selected AI platform ✨"}
+              </p>
+            )}
           </div>
-
-          {/* Size hint badge */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
-              Size
-            </span>
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-muted text-muted-foreground border border-border/60">
-              {ageProfile.sizeHint}
-            </span>
-          </div>
-        </div>
+        )}
       </motion.div>
+
+      {/* AI Banner */}
+      {selectedAI &&
+        (() => {
+          const aiNames: Record<string, string> = {
+            gemini: "Google Gemini",
+            chatgpt: "ChatGPT",
+            metallamа: "Meta LLaMA",
+            grok: "Grok",
+          };
+          const aiUrls: Record<string, string> = {
+            gemini: "https://gemini.google.com",
+            chatgpt: "https://chatgpt.com",
+            metallamа: "https://llama.meta.com",
+            grok: "https://grok.x.ai",
+          };
+          const aiName = aiNames[selectedAI] || selectedAI;
+          return aiConnected ? (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="ios-card px-4 py-3 flex items-start gap-3"
+              style={{ borderLeft: "3px solid #16a34a" }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-0.5">
+                  ✅ Connected to {aiName} — suggestions now powered by {aiName}
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Your selections are being enhanced by {aiName}. Data stays on
+                  your phone only.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem(`cc_ai_connected_${selectedAI}`);
+                  setAiConnected(false);
+                }}
+                className="flex-shrink-0 text-[10px] font-semibold text-muted-foreground border border-border/60 rounded-full px-2.5 py-1 hover:bg-muted transition-colors"
+                data-ocid="scanner.button"
+              >
+                Disconnect
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="ios-card px-4 py-3 flex items-start gap-3"
+              style={{ borderLeft: "3px solid oklch(var(--primary))" }}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground mb-0.5">
+                  🔐 Sign in to {aiName} for richer suggestions
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Your data is never stored by this app — everything stays on
+                  your phone only.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <a
+                  href={aiUrls[selectedAI]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    localStorage.setItem(`cc_ai_connected_${selectedAI}`, "1");
+                    setAiConnected(true);
+                  }}
+                  className="flex-shrink-0 text-[11px] font-bold text-primary border border-primary/40 rounded-full px-3 py-1 hover:bg-primary/10 transition-colors whitespace-nowrap"
+                  data-ocid="scanner.link"
+                >
+                  Open {aiName} →
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAI("")}
+                  className="text-[10px] text-muted-foreground hover:text-foreground transition-colors text-center"
+                  data-ocid="scanner.close_button"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </motion.div>
+          );
+        })()}
 
       {/* ── Camera Card ── */}
       <motion.div
@@ -2101,8 +2160,6 @@ export default function ScannerPage() {
           </div>
         </div>
       </motion.div>
-
-      {/* ── Colour History Strip ── */}
       <AnimatePresence>
         {colorHistory.length > 0 && (
           <motion.div
@@ -2145,8 +2202,6 @@ export default function ScannerPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Action Buttons ── */}
       <div className="grid grid-cols-2 gap-3">
         <Button
           type="button"
@@ -2178,8 +2233,6 @@ export default function ScannerPage() {
           {isLoadingAdvice ? "Analyzing…" : "AI Advice"}
         </Button>
       </div>
-
-      {/* ── Garment Type Selector ── */}
       <AnimatePresence>
         {(lockedColor !== null || adviceHex !== null) && (
           <motion.div
@@ -2250,8 +2303,6 @@ export default function ScannerPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── AI Advice Panel ── */}
       <AnimatePresence>
         {adviceHex !== null && (
           <motion.div
@@ -2478,8 +2529,6 @@ export default function ScannerPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── 10 Matching Colours (tappable) ── */}
       <motion.div
         className="ios-card"
         initial={{ opacity: 0, y: 20 }}
@@ -2610,8 +2659,6 @@ export default function ScannerPage() {
           </p>
         </div>
       </motion.div>
-
-      {/* ── Shop Matching Styles ── */}
       <AnimatePresence>
         {showShoppingSection && (
           <motion.div

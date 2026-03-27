@@ -1,24 +1,20 @@
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import {
   AlertCircle,
-  ArrowLeft,
-  Bookmark,
   Camera,
+  ChevronLeft,
   Copy,
+  Download,
   Heart,
   Loader2,
   RefreshCw,
-  Send,
   Share2,
-  Star,
-  Trash2,
   Upload,
   User,
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SiWhatsapp, SiX } from "react-icons/si";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -28,1058 +24,535 @@ import {
   analyzeOutfitScore,
   detectCoupleInPhoto,
   detectHuman,
+  detectSkinTone,
+  extractCoupleColors,
 } from "../utils/geminiAI";
-import { extractCoupleColors } from "../utils/geminiAI";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ---- Types ----------------------------------------------------------------
 
-type ScoreMode = "single" | "couple";
-type ScorePageState =
+type PageMode = "single" | "couple";
+type PageState =
   | "idle"
-  | "hasPhoto"
+  | "cropping"
   | "detecting"
   | "analyzing"
   | "results"
   | "error";
+type ErrorType =
+  | "no_person"
+  | "need_two_people"
+  | "analysis_failed"
+  | "general";
 
-interface HistoryEntry extends OutfitScoreResult {
+interface LookbookEntry {
   id: string;
   photoDataUrl: string;
+  score: number;
+  mode: PageMode;
   date: string;
-  mode?: ScoreMode;
+  result: OutfitScoreResult | null;
+  coupleResult?: {
+    person1Color: string;
+    person2Color: string;
+    person1Description: string;
+    person2Description: string;
+    harmonyScore: number;
+    harmonyAdvice: string;
+    fixItSuggestion: string | null;
+  } | null;
+  skinTone?: "fair" | "wheatish" | "medium" | "dark";
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+interface OutfitScorePageProps {
+  onNavigateToSkinTone?: () => void;
+}
 
-function loadHistory(key: string): HistoryEntry[] {
+// ---- Skin tone palettes ---------------------------------------------------
+
+const SKIN_TONE_PALETTES = {
+  fair: [
+    { color: "#6B8DD6", name: "Slate Blue" },
+    { color: "#D4A5C9", name: "Dusty Pink" },
+    { color: "#B8D4E8", name: "Powder Blue" },
+    { color: "#E8D5B7", name: "Champagne" },
+    { color: "#A8C5A0", name: "Sage Green" },
+    { color: "#9B8EC4", name: "Lavender" },
+  ],
+  wheatish: [
+    { color: "#E8785A", name: "Coral" },
+    { color: "#C4622D", name: "Rust" },
+    { color: "#6B7A3C", name: "Olive" },
+    { color: "#C46B3C", name: "Terracotta" },
+    { color: "#D4B84A", name: "Warm Yellow" },
+    { color: "#1E3A5F", name: "Navy" },
+  ],
+  medium: [
+    { color: "#1B6B3A", name: "Emerald" },
+    { color: "#1B4B8A", name: "Sapphire" },
+    { color: "#8B1A2A", name: "Ruby" },
+    { color: "#7A4528", name: "Burnt Orange" },
+    { color: "#2D4A2D", name: "Forest Green" },
+    { color: "#8B6914", name: "Golden Brown" },
+  ],
+  dark: [
+    { color: "#FFFFFF", name: "Pure White" },
+    { color: "#FFD700", name: "Gold" },
+    { color: "#FF4500", name: "Bright Red" },
+    { color: "#FF8C00", name: "Orange" },
+    { color: "#00BFFF", name: "Electric Blue" },
+    { color: "#C0C0C0", name: "Silver" },
+  ],
+};
+
+// ---- Helpers --------------------------------------------------------------
+
+function getScoreColor(score: number): string {
+  if (score >= 85) return "#22c55e";
+  if (score >= 70) return "#3b82f6";
+  if (score >= 50) return "#f59e0b";
+  return "#ef4444";
+}
+
+function getScoreGrade(score: number): string {
+  if (score >= 90) return "S";
+  if (score >= 80) return "A";
+  if (score >= 70) return "B";
+  if (score >= 60) return "C";
+  if (score >= 50) return "D";
+  return "F";
+}
+
+function getLookbook(): LookbookEntry[] {
   try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
+    const raw = localStorage.getItem("cc_lookbook");
+    return raw ? (JSON.parse(raw) as LookbookEntry[]) : [];
   } catch {
     return [];
   }
 }
 
-function saveHistory(key: string, entries: HistoryEntry[]) {
-  localStorage.setItem(key, JSON.stringify(entries));
+function saveLookbook(entries: LookbookEntry[]) {
+  try {
+    localStorage.setItem("cc_lookbook", JSON.stringify(entries.slice(0, 20)));
+  } catch {
+    // ignore
+  }
 }
 
-function getGrade(score: number): string {
-  if (score >= 90) return "A+";
-  if (score >= 80) return "A";
-  if (score >= 70) return "B";
-  if (score >= 50) return "C";
-  return "D";
+function addToLookbook(entry: LookbookEntry) {
+  const existing = getLookbook();
+  const updated = [entry, ...existing.filter((e) => e.id !== entry.id)];
+  saveLookbook(updated);
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 70) return "#22c55e";
-  if (score >= 50) return "#f59e0b";
-  return "#ef4444";
+function getLikeState(id: string): boolean {
+  return localStorage.getItem(`cc_likes_${id}`) === "1";
 }
 
-// ── Loading Pulse ─────────────────────────────────────────────────────────────
-
-function LoadingPulse({ message }: { message: string }) {
-  return (
-    <motion.div
-      key="loading-pulse"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="flex flex-col items-center justify-center gap-6 py-16"
-      data-ocid="outfit.loading_state"
-    >
-      <style>{`
-        @keyframes pulse-ring {
-          0% { transform: scale(0.6); opacity: 0.8; }
-          100% { transform: scale(2.2); opacity: 0; }
-        }
-        .pulse-ring {
-          position: absolute;
-          border-radius: 50%;
-          border: 2px solid oklch(0.55 0.22 250);
-          animation: pulse-ring 2s ease-out infinite;
-        }
-        .pulse-ring-2 { animation-delay: 0.6s !important; }
-        .pulse-ring-3 { animation-delay: 1.2s !important; }
-      `}</style>
-      <div className="relative flex items-center justify-center w-20 h-20">
-        <div className="pulse-ring w-16 h-16" />
-        <div className="pulse-ring pulse-ring-2 w-16 h-16" />
-        <div className="pulse-ring pulse-ring-3 w-16 h-16" />
-        <div className="relative w-14 h-14 rounded-full bg-primary/15 border border-primary/40 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        </div>
-      </div>
-      <div className="text-center">
-        <p className="text-sm font-semibold text-foreground">{message}</p>
-        <p className="text-xs text-muted-foreground mt-1">Please wait...</p>
-      </div>
-    </motion.div>
-  );
+function getLikeCount(id: string): number {
+  const stored = localStorage.getItem(`cc_likecount_${id}`);
+  return stored ? Number(stored) : 0;
 }
 
-// ── Instagram Post Card ───────────────────────────────────────────────────────
+function setLikeState(id: string, liked: boolean) {
+  localStorage.setItem(`cc_likes_${id}`, liked ? "1" : "0");
+}
 
-function InstagramPostCard({
-  photo,
-  score,
-  onReset,
-  onRescan,
-}: {
-  photo: string;
-  score: OutfitScoreResult;
-  onReset: () => void;
-  onRescan: () => void;
-}) {
-  const [liked, setLiked] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const grade = getGrade(score.score);
-  const color = getScoreColor(score.score);
+function setLikeCount(id: string, count: number) {
+  localStorage.setItem(`cc_likecount_${id}`, String(count));
+}
 
-  const shareText = `My outfit scored ${score.score}/100 on Colour Clash! 🎨\nGrade: ${grade}\nColor: ${score.colorScore}/40 | Fit: ${score.fitScore}/30 | Style: ${score.styleScore}/30\n💡 ${score.suggestion}\n\nhttps://colourclash-emb.caffeine.xyz/`;
-  const encodedText = encodeURIComponent(shareText);
-
-  const handleShare = async () => {
-    try {
+// Crop a dataUrl to a 1:1 square (600x600) using crop box position
+// cropBox: {x, y, size} in container coordinates (object-contain layout)
+function cropToSquare(
+  dataUrl: string,
+  cropBox: { x: number; y: number; size: number },
+  containerW: number,
+  containerH: number,
+): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1350;
+      canvas.width = 600;
+      canvas.height = 600;
       const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Background gradient
-        const grad = ctx.createLinearGradient(0, 0, 0, 1350);
-        grad.addColorStop(0, "#0A0A0A");
-        grad.addColorStop(1, "#1A1A2E");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 1080, 1350);
-
-        // Draw photo
-        const img = new Image();
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = photo;
-        });
-        const imgH = 900;
-        const imgW = 1080;
-        ctx.drawImage(img, 0, 0, imgW, imgH);
-
-        // Score circle
-        ctx.beginPath();
-        ctx.arc(980, 870, 70, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.font = "bold 52px sans-serif";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "center";
-        ctx.fillText(String(score.score), 980, 882);
-        ctx.font = "24px sans-serif";
-        ctx.fillText("/100", 980, 912);
-
-        // App name — multicolor COLOUR CLASH
-        {
-          const letters = [
-            { ch: "C", color: "#FF3B30" },
-            { ch: "O", color: "#FF9500" },
-            { ch: "L", color: "#FFCC00" },
-            { ch: "O", color: "#34C759" },
-            { ch: "U", color: "#007AFF" },
-            { ch: "R", color: "#AF52DE" },
-            { ch: " ", color: "#fff" },
-            { ch: "C", color: "#FF3B30" },
-            { ch: "L", color: "#FF9500" },
-            { ch: "A", color: "#FFCC00" },
-            { ch: "S", color: "#34C759" },
-            { ch: "H", color: "#007AFF" },
-          ];
-          ctx.font = "bold 42px system-ui";
-          let bx = 540 - ctx.measureText("COLOUR CLASH").width / 2;
-          const brandY = 980;
-          for (const { ch, color: lc } of letters) {
-            ctx.fillStyle = lc;
-            ctx.textAlign = "left";
-            ctx.fillText(ch, bx, brandY);
-            bx += ctx.measureText(ch).width;
-          }
-          ctx.font = "italic 22px system-ui";
-          ctx.fillStyle = "rgba(255,255,255,0.5)";
-          ctx.textAlign = "center";
-          ctx.fillText("colourclash-emb.caffeine.xyz", 540, 1015);
-        }
-
-        // Analysis
-        ctx.font = "32px sans-serif";
-        ctx.fillStyle = "rgba(255,255,255,0.8)";
-        ctx.textAlign = "center";
-        ctx.fillText(score.analysis.slice(0, 60), 540, 1060);
-
-        // Suggestion
-        ctx.font = "italic 28px sans-serif";
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillText(`Tip: ${score.suggestion.slice(0, 65)}`, 540, 1120);
-
-        const blob = await new Promise<Blob | null>((res) =>
-          canvas.toBlob(res, "image/png"),
-        );
-        if (blob && navigator.share) {
-          const file = new File([blob], "colour-clash-score.png", {
-            type: "image/png",
-          });
-          await navigator.share({
-            title: "My Colour Clash Outfit Score",
-            text: shareText,
-            files: [file],
-          });
-          return;
-        }
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
       }
-      if (navigator.share) {
-        await navigator.share({
-          title: "My Colour Clash Outfit Score",
-          text: shareText,
-          url: "https://colourclash-emb.caffeine.xyz/",
-        });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-        toast.success("Score copied to clipboard!");
-      }
-    } catch {
-      // user cancelled
-    }
-  };
+      // Compute object-contain scale and letterbox offsets
+      const scaleToFit = Math.min(
+        containerW / img.naturalWidth,
+        containerH / img.naturalHeight,
+      );
+      const renderedW = img.naturalWidth * scaleToFit;
+      const renderedH = img.naturalHeight * scaleToFit;
+      const letterboxX = (containerW - renderedW) / 2;
+      const letterboxY = (containerH - renderedH) / 2;
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(shareText);
-    toast.success("Copied to clipboard!");
-  };
+      // Map crop box from container coords to image source coords
+      const srcX = Math.max(0, (cropBox.x - letterboxX) / scaleToFit);
+      const srcY = Math.max(0, (cropBox.y - letterboxY) / scaleToFit);
+      const srcSize = cropBox.size / scaleToFit;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -16 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className="rounded-2xl shadow-xl overflow-hidden bg-card border border-border"
-      data-ocid="outfit.card"
-    >
-      {/* Post header */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0 shadow">
-          <span className="text-primary-foreground text-xs font-extrabold tracking-tight">
-            CC
-          </span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-foreground leading-none">
-            ColourClash
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Outfit Score</p>
-        </div>
-      </div>
+      ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, 600, 600);
+      resolve(canvas.toDataURL("image/jpeg", 0.95));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
 
-      {/* Photo */}
-      <div className="relative w-full aspect-square bg-muted overflow-hidden">
-        <img
-          src={photo}
-          alt="Your outfit"
-          className="w-full h-full object-cover"
-        />
-        <motion.div
-          className="absolute bottom-3 left-3"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.35, type: "spring", stiffness: 280 }}
-        >
-          <div
-            className="flex items-center gap-2 rounded-full px-3 py-1.5"
-            style={{
-              background: "rgba(0,0,0,0.55)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              border: "1px solid rgba(255,255,255,0.2)",
-            }}
-          >
-            <span className="text-yellow-400 text-base leading-none">⭐</span>
-            <span className="text-white font-extrabold text-sm leading-none">
-              {score.score}
-            </span>
-            <span className="text-white/60 text-xs leading-none">/100</span>
-            <span
-              className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full"
-              style={{ background: color, color: "#fff" }}
-            >
-              {grade}
-            </span>
-          </div>
-        </motion.div>
-      </div>
+// Draw couple bounding boxes on canvas overlay
+function drawCoupleBoundingBoxes(
+  canvas: HTMLCanvasElement,
+  w: number,
+  h: number,
+) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
 
-      {/* Score breakdown */}
-      <div className="px-4 pt-4 pb-2">
-        <div className="space-y-2.5">
-          {[
-            { label: "Color Harmony", val: score.colorScore, max: 40, pct: 40 },
-            { label: "Fit", val: score.fitScore, max: 30, pct: 30 },
-            {
-              label: "Style & Trends",
-              val: score.styleScore,
-              max: 30,
-              pct: 30,
-            },
-          ].map(({ label, val, max, pct }) => (
-            <div key={label} className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground w-28 flex-shrink-0">
-                {label}
-                <span className="text-muted-foreground/60"> ({pct}%)</span>
-              </span>
-              <div className="flex-1">
-                <Progress value={(val / max) * 100} className="h-1.5" />
-              </div>
-              <span className="text-xs font-bold w-10 text-right text-foreground">
-                {val}/{max}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+  // Person 1 (left half) - blue dashed
+  ctx.strokeStyle = "#3B82F6";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 4]);
+  ctx.strokeRect(8, 8, w / 2 - 16, h - 16);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(59,130,246,0.85)";
+  ctx.fillRect(8, 8, 36, 22);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 13px system-ui";
+  ctx.fillText("P1", 16, 23);
 
-      {/* Analysis */}
-      {score.analysis && (
-        <div className="px-4 pb-1">
-          <p className="text-xs text-foreground/80 leading-relaxed">
-            💬 {score.analysis}
-          </p>
-        </div>
-      )}
+  // Person 2 (right half) - pink dashed
+  ctx.strokeStyle = "#EC4899";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 4]);
+  ctx.strokeRect(w / 2 + 8, 8, w / 2 - 16, h - 16);
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(236,72,153,0.85)";
+  ctx.fillRect(w / 2 + 8, 8, 36, 22);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 13px system-ui";
+  ctx.fillText("P2", w / 2 + 16, 23);
+}
 
-      {/* Suggestion */}
-      {score.suggestion && (
-        <div className="px-4 pb-3">
-          <p className="text-xs text-primary/80 italic leading-relaxed">
-            💡 {score.suggestion}
-          </p>
-        </div>
-      )}
+// Build a shareable composite PNG (1080x1080)
+async function buildShareImage(
+  photoDataUrl: string,
+  score: number,
+  isCouple: boolean,
+): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1080;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas unavailable");
 
-      {/* Action bar */}
-      <div
-        className="px-4 py-2"
-        style={{ borderTop: "0.5px solid oklch(var(--border))" }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setLiked((v) => !v)}
-              className="flex items-center gap-1 transition-transform active:scale-90"
-              aria-label="Like"
-              data-ocid="outfit.toggle"
-            >
-              <Heart
-                className={`w-6 h-6 transition-colors ${
-                  liked ? "fill-red-500 text-red-500" : "text-foreground"
-                }`}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={handleShare}
-              className="text-foreground opacity-70 hover:opacity-100 transition-opacity"
-              aria-label="Share"
-              data-ocid="outfit.secondary_button"
-            >
-              <Send className="w-6 h-6" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowShare((v) => !v)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-ocid="outfit.secondary_button"
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setBookmarked((v) => !v)}
-            aria-label="Bookmark"
-          >
-            <Bookmark
-              className={`w-6 h-6 transition-colors ${
-                bookmarked ? "fill-primary text-primary" : "text-foreground"
-              }`}
-            />
-          </button>
-        </div>
-      </div>
+  // Draw photo
+  const img = new Image();
+  await new Promise<void>((res, rej) => {
+    img.onload = () => res();
+    img.onerror = () => rej(new Error("img load failed"));
+    img.src = photoDataUrl;
+  });
+  ctx.drawImage(img, 0, 0, 1080, 1080);
 
-      <AnimatePresence>
-        {showShare && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-2 font-medium">
-                Share to
-              </p>
-              <div className="flex gap-2">
-                <a
-                  href={`https://wa.me/?text=${encodedText}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-[#25D366] text-white text-xs font-semibold"
-                  data-ocid="outfit.secondary_button"
-                >
-                  <SiWhatsapp className="w-4 h-4" /> WhatsApp
-                </a>
-                <a
-                  href={`https://twitter.com/intent/tweet?text=${encodedText}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 bg-black text-white text-xs font-semibold"
-                  data-ocid="outfit.secondary_button"
-                >
-                  <SiX className="w-3.5 h-3.5" /> Twitter/X
-                </a>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2 border border-border text-foreground text-xs font-semibold"
-                  data-ocid="outfit.secondary_button"
-                >
-                  <Copy className="w-4 h-4" /> Copy
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+  // Couple bounding boxes
+  if (isCouple) {
+    ctx.strokeStyle = "#3B82F6";
+    ctx.lineWidth = 6;
+    ctx.setLineDash([16, 8]);
+    ctx.strokeRect(16, 16, 520, 1048);
+    ctx.strokeStyle = "#EC4899";
+    ctx.strokeRect(544, 16, 520, 1048);
+    ctx.setLineDash([]);
+  }
 
-      <div className="px-4 pb-4">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 text-primary py-2.5 text-sm font-medium hover:bg-primary/10 transition-colors"
-            onClick={onRescan}
-            data-ocid="outfit.primary_button"
-          >
-            <RefreshCw className="w-4 h-4" /> Re-analyse
-          </button>
-          <button
-            type="button"
-            className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
-            onClick={onReset}
-            data-ocid="outfit.primary_button"
-          >
-            <Star className="w-4 h-4" /> Score Another
-          </button>
-        </div>
-      </div>
-    </motion.div>
+  // Dark gradient at bottom
+  const grad = ctx.createLinearGradient(0, 600, 0, 1080);
+  grad.addColorStop(0, "transparent");
+  grad.addColorStop(1, "rgba(0,0,0,0.85)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1080, 1080);
+
+  // Score badge (top right)
+  ctx.fillStyle = getScoreColor(score);
+  ctx.beginPath();
+  ctx.arc(950, 130, 90, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 52px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(String(score), 950, 145);
+  ctx.font = "bold 26px system-ui";
+  ctx.fillText("/100", 950, 182);
+
+  // App branding (bottom left)
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 42px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText("COLOUR CLASH", 60, 980);
+  ctx.font = "26px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillText("just fly with it... • colourclash-emb.caffeine.xyz", 60, 1024);
+
+  return new Promise<Blob>((res, rej) =>
+    canvas.toBlob(
+      (b) => (b ? res(b) : rej(new Error("toBlob failed"))),
+      "image/png",
+    ),
   );
 }
 
-// ── Couple Result Card ────────────────────────────────────────────────────────
+// ---- Loading Pulse Component ----------------------------------------------
 
-function CoupleResultCard({
-  photo,
-  person1Color,
-  person2Color,
-  person1Desc,
-  person2Desc,
-  onReset,
-}: {
-  photo: string;
-  person1Color: string;
-  person2Color: string;
-  person1Desc: string;
-  person2Desc: string;
-  onReset: () => void;
-}) {
-  const harmony = getCoupleHarmonyScore(person1Color, person2Color);
-  const grade = getGrade(harmony.score);
-  const color = getScoreColor(harmony.score);
-
-  const tierLabels: Record<string, string> = {
-    monochromatic: "Monochromatic 🌟",
-    complementary: "Complementary 💖",
-    neutrals_pop: "Neutrals + Pop ✨",
-    analogous: "Analogous 🌚",
-    clash: "High Clash ⚠️",
-  };
-
-  const shareText = `Our couple outfit scored ${harmony.score}/100 on Colour Clash! 👫\nHarmony: ${tierLabels[harmony.tier]}\n${harmony.advice}\n\nhttps://colourclash-emb.caffeine.xyz/`;
-  const encodedText = encodeURIComponent(shareText);
-
-  const handleShare = async () => {
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1080;
-      canvas.height = 1350;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Background
-        const grad = ctx.createLinearGradient(0, 0, 0, 1350);
-        grad.addColorStop(0, "#0A0A0A");
-        grad.addColorStop(1, "#1A0A2E");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 1080, 1350);
-
-        // Draw actual photo
-        const img = new Image();
-        await new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          img.src = photo;
-        });
-        const imgH = 900;
-        ctx.drawImage(img, 0, 0, 1080, imgH);
-
-        // Semi-transparent overlay for readability
-        ctx.fillStyle = "rgba(0,0,0,0.15)";
-        ctx.fillRect(0, 0, 1080, imgH);
-
-        // Person 1 bounding box (left half) — blue dashed
-        ctx.save();
-        ctx.setLineDash([16, 8]);
-        ctx.strokeStyle = "#60A5FA";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(30, 50, 480, 820);
-        ctx.restore();
-
-        // Person 1 label badge
-        ctx.fillStyle = "rgba(96,165,250,0.85)";
-        ctx.fillRect(38, 58, 160, 32);
-        ctx.font = "bold 18px system-ui";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "left";
-        ctx.fillText(`P1 • ${person1Desc}`, 50, 80);
-
-        // Person 2 bounding box (right half) — pink dashed
-        ctx.save();
-        ctx.setLineDash([16, 8]);
-        ctx.strokeStyle = "#F472B6";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(570, 50, 480, 820);
-        ctx.restore();
-
-        // Person 2 label badge
-        ctx.fillStyle = "rgba(244,114,182,0.85)";
-        ctx.fillRect(578, 58, 160, 32);
-        ctx.font = "bold 18px system-ui";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "left";
-        ctx.fillText(`P2 • ${person2Desc}`, 590, 80);
-
-        // Score circle (bottom right of photo)
-        ctx.beginPath();
-        ctx.arc(980, 870, 70, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.font = "bold 52px system-ui";
-        ctx.fillStyle = "#fff";
-        ctx.textAlign = "center";
-        ctx.fillText(String(harmony.score), 980, 882);
-        ctx.font = "24px system-ui";
-        ctx.fillText("/100", 980, 912);
-
-        // Harmony tier label
-        ctx.font = "bold 34px system-ui";
-        ctx.fillStyle = "rgba(255,255,255,0.85)";
-        ctx.fillText(tierLabels[harmony.tier], 540, 970);
-
-        // Advice text (wrapped)
-        ctx.font = "italic 26px system-ui";
-        ctx.fillStyle = "rgba(255,255,255,0.65)";
-        const adviceWords = harmony.advice.split(" ");
-        let line = "";
-        let y = 1020;
-        for (const word of adviceWords) {
-          const testLine = `${line}${word} `;
-          if (ctx.measureText(testLine).width > 980 && line) {
-            ctx.fillText(line.trim(), 540, y);
-            line = `${word} `;
-            y += 36;
-          } else {
-            line = testLine;
-          }
-        }
-        if (line) ctx.fillText(line.trim(), 540, y);
-
-        // Branding — multicolor COLOUR CLASH
-        const brandY = 1290;
-        const letters = [
-          { ch: "C", color: "#FF3B30" },
-          { ch: "O", color: "#FF9500" },
-          { ch: "L", color: "#FFCC00" },
-          { ch: "O", color: "#34C759" },
-          { ch: "U", color: "#007AFF" },
-          { ch: "R", color: "#AF52DE" },
-          { ch: " ", color: "#fff" },
-          { ch: "C", color: "#FF3B30" },
-          { ch: "L", color: "#FF9500" },
-          { ch: "A", color: "#FFCC00" },
-          { ch: "S", color: "#34C759" },
-          { ch: "H", color: "#007AFF" },
-        ];
-        ctx.font = "bold 32px system-ui";
-        let bx = 540 - ctx.measureText("COLOUR CLASH").width / 2;
-        for (const { ch, color: lc } of letters) {
-          ctx.fillStyle = lc;
-          ctx.textAlign = "left";
-          ctx.fillText(ch, bx, brandY);
-          bx += ctx.measureText(ch).width;
-        }
-        ctx.font = "italic 20px system-ui";
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.textAlign = "center";
-        ctx.fillText("colourclash-emb.caffeine.xyz", 540, 1315);
-
-        const blob = await new Promise<Blob | null>((res) =>
-          canvas.toBlob(res, "image/png"),
-        );
-        if (blob && navigator.share) {
-          const file = new File([blob], "couple-colour-clash-score.png", {
-            type: "image/png",
-          });
-          await navigator.share({
-            title: "Our Couple Colour Clash Score",
-            text: shareText,
-            files: [file],
-          });
-          return;
-        }
-      }
-      if (navigator.share) {
-        await navigator.share({
-          title: "Our Couple Colour Clash Score",
-          text: shareText,
-          url: "https://colourclash-emb.caffeine.xyz/",
-        });
-      } else {
-        await navigator.clipboard.writeText(shareText);
-        toast.success("Copied to clipboard!");
-      }
-    } catch {
-      //
-    }
-  };
-
+function LoadingPulse({ label }: { label: string }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl shadow-xl overflow-hidden bg-card border border-border"
-      data-ocid="outfit.card"
+    <div
+      className="flex flex-col items-center justify-center gap-4 py-16"
+      data-ocid="score.loading_state"
     >
-      {/* Couple header */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-blue-400 flex items-center justify-center">
-          <Users className="w-5 h-5 text-white" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-bold text-foreground">
-            Couple Harmony Score
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {tierLabels[harmony.tier]}
-          </p>
+      <div className="relative w-20 h-20">
+        <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+        <div className="absolute inset-2 rounded-full bg-primary/30 animate-pulse" />
+        <div className="absolute inset-4 rounded-full bg-primary flex items-center justify-center">
+          <Loader2 className="w-6 h-6 text-primary-foreground animate-spin" />
         </div>
       </div>
-
-      {/* Photo with simulated bounding boxes */}
-      <div className="relative w-full aspect-square bg-muted overflow-hidden">
-        <img
-          src={photo}
-          alt="Couple outfit"
-          className="w-full h-full object-cover"
-        />
-        {/* Person 1 bounding box - left half */}
-        <div
-          style={{
-            position: "absolute",
-            top: "5%",
-            left: "3%",
-            width: "44%",
-            height: "88%",
-            border: "2px dashed #60A5FA",
-            borderRadius: 8,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: 6,
-              left: 6,
-              background: "rgba(96,165,250,0.85)",
-              borderRadius: 6,
-              padding: "2px 8px",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: person1Color,
-                border: "1px solid #fff",
-              }}
-            />
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>
-              Person 1 • {person1Desc}
-            </span>
-          </div>
-        </div>
-        {/* Person 2 bounding box - right half */}
-        <div
-          style={{
-            position: "absolute",
-            top: "5%",
-            right: "3%",
-            width: "44%",
-            height: "88%",
-            border: "2px dashed #F472B6",
-            borderRadius: 8,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: 6,
-              right: 6,
-              background: "rgba(244,114,182,0.85)",
-              borderRadius: 6,
-              padding: "2px 8px",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <div
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                background: person2Color,
-                border: "1px solid #fff",
-              }}
-            />
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#fff" }}>
-              Person 2 • {person2Desc}
-            </span>
-          </div>
-        </div>
-        {/* Score badge */}
-        <div
-          className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full px-3 py-1.5"
-          style={{
-            background: "rgba(0,0,0,0.65)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-          }}
-        >
-          <Users className="w-3.5 h-3.5 text-pink-400" />
-          <span className="text-white font-extrabold text-sm">
-            {harmony.score}
-          </span>
-          <span className="text-white/60 text-xs">/100</span>
-          <span
-            className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full"
-            style={{ background: color, color: "#fff" }}
-          >
-            {grade}
-          </span>
-        </div>
-      </div>
-
-      {/* Color swatches */}
-      <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 6,
-              background: person1Color,
-              border: "1px solid rgba(0,0,0,0.1)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
-          />
-          <span className="text-xs text-foreground">{person1Desc}</span>
-        </div>
-        <span className="text-muted-foreground text-xs">+</span>
-        <div className="flex items-center gap-2">
-          <div
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 6,
-              background: person2Color,
-              border: "1px solid rgba(0,0,0,0.1)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            }}
-          />
-          <span className="text-xs text-foreground">{person2Desc}</span>
-        </div>
-        <span className="ml-auto text-xs font-bold" style={{ color }}>
-          {tierLabels[harmony.tier]}
-        </span>
-      </div>
-
-      {/* Advice */}
-      <div className="px-4 pb-2">
-        <p className="text-sm font-medium text-foreground">{harmony.advice}</p>
-      </div>
-
-      {/* Fix-it suggestion */}
-      {harmony.fixItSuggestion && (
-        <div className="mx-4 mb-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-          <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
-            💡 <strong>Style Fix:</strong> {harmony.fixItSuggestion}
-          </p>
-        </div>
-      )}
-
-      {/* Share */}
-      <div className="px-4 pb-4 flex gap-2">
-        <button
-          type="button"
-          onClick={handleShare}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-semibold"
-          data-ocid="outfit.primary_button"
-        >
-          <Share2 className="w-4 h-4" /> Share Score
-        </button>
-        <button
-          type="button"
-          onClick={onReset}
-          className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-border text-foreground py-2.5 text-sm font-medium"
-          data-ocid="outfit.secondary_button"
-        >
-          <RefreshCw className="w-4 h-4" /> Try Again
-        </button>
-      </div>
-
-      {/* Share links */}
-      <div className="px-4 pb-4">
-        <div className="flex gap-2">
-          <a
-            href={`https://wa.me/?text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 bg-[#25D366] text-white text-xs font-semibold"
-          >
-            <SiWhatsapp className="w-3.5 h-3.5" /> WhatsApp
-          </a>
-          <a
-            href={`https://twitter.com/intent/tweet?text=${encodedText}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 bg-black text-white text-xs font-semibold"
-          >
-            <SiX className="w-3 h-3" /> Twitter/X
-          </a>
-        </div>
-      </div>
-    </motion.div>
+      <p className="text-sm font-medium text-muted-foreground animate-pulse">
+        {label}
+      </p>
+    </div>
   );
 }
 
-// ── History Card ──────────────────────────────────────────────────────────────
-
-function HistoryCard({
-  entry,
-  onDelete,
-  onView,
-}: {
-  entry: HistoryEntry;
-  onDelete: (id: string) => void;
-  onView: (entry: HistoryEntry) => void;
-}) {
-  const badgeColor =
-    entry.score >= 70
-      ? "bg-emerald-500"
-      : entry.score >= 50
-        ? "bg-amber-500"
-        : "bg-red-500";
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="ios-card overflow-hidden"
-      data-ocid="outfit.item"
-    >
-      <div className="flex items-center gap-3 p-3">
-        <button
-          type="button"
-          className="flex items-center gap-3 flex-1 min-w-0 text-left"
-          onClick={() => onView(entry)}
-          data-ocid="outfit.secondary_button"
-        >
-          <img
-            src={entry.photoDataUrl}
-            alt="outfit"
-            className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                className={`${badgeColor} text-white text-xs font-bold px-2 py-0.5 rounded-full`}
-              >
-                {entry.score}
-              </span>
-              <span className="text-xs font-semibold text-foreground/70">
-                {getGrade(entry.score)}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {entry.date}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              {entry.suggestion || entry.analysis}
-            </p>
-            <p className="text-xs text-primary/70 mt-0.5 font-medium">
-              Tap to view full score →
-            </p>
-          </div>
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(entry.id)}
-          className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive/70 hover:text-destructive transition-colors flex-shrink-0"
-          data-ocid="outfit.delete_button"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Main Component ────────────────────────────────────────────────────────────
+// ---- Main Component -------------------------------------------------------
 
 export default function OutfitScorePage({
-  onNavigateToSkinTone,
-}: {
-  onNavigateToSkinTone?: () => void;
-}) {
+  onNavigateToSkinTone: _nav,
+}: OutfitScorePageProps) {
   const { identity } = useInternetIdentity();
-  const historyKey = `outfitHistory_${
-    identity?.getPrincipal().isAnonymous()
-      ? "anon"
-      : (identity?.getPrincipal().toText() ?? "anon")
-  }`;
+  const userInitials = identity
+    ? identity.getPrincipal().toString().slice(0, 2).toUpperCase()
+    : "CC";
 
+  // State machine
+  const [pageState, setPageState] = useState<PageState>("idle");
+  const [mode, setMode] = useState<PageMode>("single");
+  const [errorType, setErrorType] = useState<ErrorType>("general");
+
+  // Photo data
+  const rawPhotoRef = useRef<string>("");
+  const [cropDataUrl, setCropDataUrl] = useState<string>("");
+  const [croppedPhoto, setCroppedPhoto] = useState<string>("");
+
+  // Crop drag state (crop box moves over static image)
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+  const cropBoxDragging = useRef(false);
+  const cropBoxLastPos = useRef({ x: 0, y: 0 });
+  const [cropBoxPos, setCropBoxPos] = useState({ x: 0, y: 0 });
+
+  // Results
+  const [scoreResult, setScoreResult] = useState<OutfitScoreResult | null>(
+    null,
+  );
+  const [coupleResult, setCoupleResult] =
+    useState<LookbookEntry["coupleResult"]>(null);
+  const [skinTone, setSkinTone] = useState<
+    "fair" | "wheatish" | "medium" | "dark"
+  >("medium");
+  const [selectedSkinTone, setSelectedSkinTone] = useState<
+    "fair" | "wheatish" | "medium" | "dark"
+  >("medium");
+  const [currentEntry, setCurrentEntry] = useState<LookbookEntry | null>(null);
+
+  // Like state
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCountState] = useState(0);
+
+  // Share sheet
+  const [showShareSheet, setShowShareSheet] = useState(false);
+
+  // Lookbook
+  const [lookbook, setLookbook] = useState<LookbookEntry[]>([]);
+
+  // File input refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<ScoreMode>("single");
-  const [pageState, setPageState] = useState<ScorePageState>("idle");
-  const [loadingMsg, setLoadingMsg] = useState("Analysing your outfit...");
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [cropPhoto, setCropPhoto] = useState<string | null>(null);
-  const [score, setScore] = useState<OutfitScoreResult | null>(null);
-  const [coupleData, setCoupleData] = useState<{
-    person1Color: string;
-    person2Color: string;
-    person1Desc: string;
-    person2Desc: string;
-  } | null>(null);
-  const [noPersonMsg, setNoPersonMsg] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>(() =>
-    loadHistory(historyKey),
-  );
-  const [viewEntry, setViewEntry] = useState<HistoryEntry | null>(null);
-  const [cropRect, setCropRect] = useState({ x: 40, y: 40, w: 220, h: 220 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const dragStart = useRef({ mx: 0, my: 0, rx: 0, ry: 0 });
-  const cropImgRef = useRef<HTMLImageElement>(null);
-  const analyzeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Couple canvas overlay ref
+  const coupleCanvasRef = useRef<HTMLCanvasElement>(null);
+  const photoImgRef = useRef<HTMLImageElement>(null);
 
-  // Safety net: if stuck in analyzing/detecting > 15s, force error
   useEffect(() => {
-    if (pageState === "analyzing" || pageState === "detecting") {
-      analyzeTimeoutRef.current = setTimeout(() => {
-        setPageState("error");
-      }, 15000);
-    } else {
-      if (analyzeTimeoutRef.current) {
-        clearTimeout(analyzeTimeoutRef.current);
-        analyzeTimeoutRef.current = null;
-      }
-    }
-    return () => {
-      if (analyzeTimeoutRef.current) clearTimeout(analyzeTimeoutRef.current);
-    };
-  }, [pageState]);
+    setLookbook(getLookbook());
+  }, []);
 
-  const saveEntry = (result: OutfitScoreResult, dataUrl: string) => {
-    const entry: HistoryEntry = {
-      ...result,
-      id: Date.now().toString(),
-      photoDataUrl: dataUrl,
-      date: new Date().toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }),
-      mode,
-    };
-    setHistory((prev) => {
-      const updated = [entry, ...prev].slice(0, 20);
-      saveHistory(historyKey, updated);
-      return updated;
+  // Handle file selection (both camera and gallery)
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      // Reset input so same file can be re-selected
+      e.target.value = "";
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        if (!dataUrl) return;
+        rawPhotoRef.current = dataUrl;
+        setCropDataUrl(dataUrl);
+        setCropBoxPos({ x: 0, y: 0 });
+        setPageState("cropping");
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
+
+  // Crop drag handlers — the crop BOX moves, not the image
+  const handleCropPointerDown = useCallback((e: React.PointerEvent) => {
+    cropBoxDragging.current = true;
+    cropBoxLastPos.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  }, []);
+
+  const handleCropPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!cropBoxDragging.current) return;
+    const dx = e.clientX - cropBoxLastPos.current.x;
+    const dy = e.clientY - cropBoxLastPos.current.y;
+    cropBoxLastPos.current = { x: e.clientX, y: e.clientY };
+    setCropBoxPos((prev) => {
+      const containerEl = cropContainerRef.current;
+      const boxSize = containerEl
+        ? Math.min(containerEl.offsetWidth, containerEl.offsetHeight) * 0.8
+        : 240;
+      const maxX = containerEl ? containerEl.offsetWidth - boxSize : 0;
+      const maxY = containerEl ? containerEl.offsetHeight - boxSize : 0;
+      return {
+        x: Math.max(0, Math.min(maxX, prev.x + dx)),
+        y: Math.max(0, Math.min(maxY, prev.y + dy)),
+      };
     });
-    return entry;
-  };
+  }, []);
 
-  const analyzeSingle = async (dataUrl: string) => {
-    setPhoto(dataUrl);
-    setScore(null);
-    setCoupleData(null);
-    setNoPersonMsg(null);
+  const handleCropPointerUp = useCallback(() => {
+    cropBoxDragging.current = false;
+  }, []);
+
+  const handleCropConfirm = useCallback(async () => {
+    if (!cropDataUrl) return;
+    const containerEl = cropContainerRef.current;
+    const containerW = containerEl?.offsetWidth ?? 300;
+    const containerH = containerEl?.offsetHeight ?? 420;
+    const boxSize = Math.min(containerW, containerH) * 0.8;
+    const cropped = await cropToSquare(
+      cropDataUrl,
+      { x: cropBoxPos.x, y: cropBoxPos.y, size: boxSize },
+      containerW,
+      containerH,
+    );
+    setCroppedPhoto(cropped);
+    setPageState("detecting");
+
+    // Extract base64 for API calls
+    const base64 = cropped.split(",")[1] ?? "";
 
     try {
-      // Step 1: Detect human
-      setPageState("detecting");
-      setLoadingMsg("Checking for a person...");
-      const base64 = dataUrl.split(",")[1];
-      const mimeMatch = dataUrl.match(/data:([^;]+);/);
-      const mimeType = (mimeMatch?.[1] ?? "image/jpeg") as string;
-
-      const humanDetected = await detectHuman(base64, mimeType);
-      if (humanDetected === "NO") {
-        setNoPersonMsg(
-          "No person detected! Please capture or upload a photo of a person for an accurate style score.",
+      if (mode === "couple") {
+        const coupleDetect = await detectCoupleInPhoto(base64);
+        if (coupleDetect === "NO") {
+          setErrorType("no_person");
+          setPageState("error");
+          return;
+        }
+        // Proceed to analyze
+        setPageState("analyzing");
+        const [colors, stResult] = await Promise.all([
+          extractCoupleColors(base64),
+          detectSkinTone(base64),
+        ]);
+        const harmony = getCoupleHarmonyScore(
+          colors.person1Color,
+          colors.person2Color,
         );
-        setPageState("error");
-        return;
+        const cr: LookbookEntry["coupleResult"] = {
+          person1Color: colors.person1Color,
+          person2Color: colors.person2Color,
+          person1Description: colors.person1Description,
+          person2Description: colors.person2Description,
+          harmonyScore: harmony.score,
+          harmonyAdvice: harmony.advice,
+          fixItSuggestion: harmony.fixItSuggestion,
+        };
+        setCoupleResult(cr);
+        setSkinTone(stResult);
+        setSelectedSkinTone(stResult);
+        setScoreResult(null);
+        const entry: LookbookEntry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          photoDataUrl: cropped,
+          score: harmony.score,
+          mode: "couple",
+          date: new Date().toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }),
+          result: null,
+          coupleResult: cr,
+          skinTone: stResult,
+        };
+        setCurrentEntry(entry);
+        setLiked(getLikeState(entry.id));
+        setLikeCountState(getLikeCount(entry.id));
+        addToLookbook(entry);
+        setLookbook(getLookbook());
+        setPageState("results");
+      } else {
+        // Single mode
+        const humanDetect = await detectHuman(base64);
+        if (humanDetect === "NO") {
+          setErrorType("no_person");
+          setPageState("error");
+          return;
+        }
+        setPageState("analyzing");
+        const [result, stResult] = await Promise.all([
+          analyzeOutfitScore(base64),
+          detectSkinTone(base64),
+        ]);
+        setScoreResult(result);
+        setCoupleResult(null);
+        setSkinTone(stResult);
+        setSelectedSkinTone(stResult);
+        const entry: LookbookEntry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          photoDataUrl: cropped,
+          score: result.score,
+          mode: "single",
+          date: new Date().toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }),
+          result,
+          coupleResult: null,
+          skinTone: stResult,
+        };
+        setCurrentEntry(entry);
+        setLiked(getLikeState(entry.id));
+        setLikeCountState(getLikeCount(entry.id));
+        addToLookbook(entry);
+        setLookbook(getLookbook());
+        setPageState("results");
       }
-
-      // Step 2: Analyse outfit
-      setPageState("analyzing");
-      setLoadingMsg("Analysing your outfit style...");
-      const result = await analyzeOutfitScore(base64, mimeType);
-      setScore(result);
-      saveEntry(result, dataUrl);
-      setPageState("results");
     } catch (err) {
-      console.error(err);
-      // Fallback
+      console.error("Score analysis failed:", err);
+      // Use fallback — never go blank
       const fallback: OutfitScoreResult = {
         score: 72,
         colorScore: 28,
@@ -1089,668 +562,885 @@ export default function OutfitScorePage({
         suggestion:
           "Try adding a statement accessory to lift the overall style.",
       };
-      setScore(fallback);
-      saveEntry(fallback, dataUrl);
+      setScoreResult(fallback);
+      setCoupleResult(null);
+      setSkinTone("medium");
+      setSelectedSkinTone("medium");
+      const entry: LookbookEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        photoDataUrl: cropped,
+        score: fallback.score,
+        mode,
+        date: new Date().toLocaleDateString("en-IN"),
+        result: fallback,
+        coupleResult: null,
+        skinTone: "medium",
+      };
+      setCurrentEntry(entry);
+      setLiked(getLikeState(entry.id));
+      setLikeCountState(getLikeCount(entry.id));
+      addToLookbook(entry);
+      setLookbook(getLookbook());
       setPageState("results");
     }
-  };
+  }, [cropBoxPos.x, cropBoxPos.y, cropDataUrl, mode]);
 
-  const analyzeCouple = async (dataUrl: string) => {
-    setPhoto(dataUrl);
-    setScore(null);
-    setCoupleData(null);
-    setNoPersonMsg(null);
+  // Draw couple bounding boxes when results appear
+  useEffect(() => {
+    if (
+      pageState === "results" &&
+      mode === "couple" &&
+      coupleCanvasRef.current &&
+      photoImgRef.current
+    ) {
+      const img = photoImgRef.current;
+      const draw = () => {
+        const canvas = coupleCanvasRef.current;
+        if (!canvas) return;
+        const w = img.offsetWidth;
+        const h = img.offsetHeight;
+        canvas.width = w;
+        canvas.height = h;
+        drawCoupleBoundingBoxes(canvas, w, h);
+      };
+      if (img.complete) draw();
+      else img.onload = draw;
+    }
+  }, [pageState, mode]);
 
+  const handleToggleLike = useCallback(() => {
+    if (!currentEntry) return;
+    const newLiked = !liked;
+    const newCount = likeCount + (newLiked ? 1 : -1);
+    setLiked(newLiked);
+    setLikeCountState(newCount);
+    setLikeState(currentEntry.id, newLiked);
+    setLikeCount(currentEntry.id, newCount);
+  }, [liked, likeCount, currentEntry]);
+
+  const handleShare = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    const shareText = `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`;
     try {
-      setPageState("detecting");
-      setLoadingMsg("Detecting people in photo...");
-      const base64 = dataUrl.split(",")[1];
-      const mimeMatch = dataUrl.match(/data:([^;]+);/);
-      const mimeType = (mimeMatch?.[1] ?? "image/jpeg") as string;
-
-      const detection = await detectCoupleInPhoto(base64, mimeType);
-      if (detection === "NO") {
-        setNoPersonMsg(
-          "No people detected! Please upload a photo with people visible.",
-        );
-        setPageState("error");
-        return;
-      }
-      if (detection === "YES_ONE") {
-        setNoPersonMsg(
-          "We only detected one person. For Couple Mode, please use a photo with both people visible.",
-        );
-        setPageState("error");
-        return;
-      }
-
-      setPageState("analyzing");
-      setLoadingMsg("Extracting colours and scoring couple harmony...");
-      const colors = await extractCoupleColors(base64, mimeType);
-      setCoupleData({
-        person1Color: colors.person1Color,
-        person2Color: colors.person2Color,
-        person1Desc: colors.person1Description,
-        person2Desc: colors.person2Description,
-      });
-      const harmonyResult = getCoupleHarmonyScore(
-        colors.person1Color,
-        colors.person2Color,
+      toast.loading("Preparing share...", { id: "share" });
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
       );
-      const coupleEntry: OutfitScoreResult = {
-        score: harmonyResult.score,
-        colorScore: Math.round(harmonyResult.score * 0.4),
-        fitScore: Math.round(harmonyResult.score * 0.3),
-        styleScore:
-          harmonyResult.score -
-          Math.round(harmonyResult.score * 0.4) -
-          Math.round(harmonyResult.score * 0.3),
-        analysis: `Couple harmony: ${harmonyResult.tier} — ${colors.person1Description} & ${colors.person2Description}`,
-        suggestion: harmonyResult.advice,
-      };
-      saveEntry(coupleEntry, dataUrl);
-      setPageState("results");
+      toast.dismiss("share");
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Colour Clash Score",
+          text: shareText,
+        });
+        return;
+      }
+      // Fallback: open share sheet with download option
+      setShowShareSheet(true);
     } catch (err) {
-      console.error(err);
-      setCoupleData({
-        person1Color: "#3B82F6",
-        person2Color: "#F59E0B",
-        person1Desc: "Blue",
-        person2Desc: "Amber",
-      });
-      const fallbackHarmony = getCoupleHarmonyScore("#3B82F6", "#F59E0B");
-      const fallbackEntry: OutfitScoreResult = {
-        score: fallbackHarmony.score,
-        colorScore: Math.round(fallbackHarmony.score * 0.4),
-        fitScore: Math.round(fallbackHarmony.score * 0.3),
-        styleScore:
-          fallbackHarmony.score -
-          Math.round(fallbackHarmony.score * 0.4) -
-          Math.round(fallbackHarmony.score * 0.3),
-        analysis: "Couple harmony analysis (estimated)",
-        suggestion: fallbackHarmony.advice,
-      };
-      saveEntry(fallbackEntry, dataUrl);
-      setPageState("results");
+      toast.dismiss("share");
+      console.error("Share error:", err);
+      setShowShareSheet(true);
     }
-  };
+  }, [currentEntry, mode]);
 
-  const handleCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      if (!dataUrl) return;
-      setPhoto(dataUrl);
-      setCropPhoto(null);
-      setPageState("hasPhoto");
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const handleGalleryChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setTimeout(() => {
-        setCropPhoto(dataUrl);
-        setPageState("hasPhoto");
-      }, 50);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const applyCrop = () => {
-    if (!cropPhoto || !cropImgRef.current) return;
-    const img = cropImgRef.current;
-    const scaleX = img.naturalWidth / img.offsetWidth;
-    const scaleY = img.naturalHeight / img.offsetHeight;
-    const canvas = document.createElement("canvas");
-    canvas.width = cropRect.w * scaleX;
-    canvas.height = cropRect.h * scaleY;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const tempImg = new Image();
-    tempImg.onload = () => {
-      ctx.drawImage(
-        tempImg,
-        cropRect.x * scaleX,
-        cropRect.y * scaleY,
-        cropRect.w * scaleX,
-        cropRect.h * scaleY,
-        0,
-        0,
-        canvas.width,
-        canvas.height,
+  const handleSave = useCallback(async () => {
+    if (!currentEntry) return;
+    try {
+      toast.loading("Saving...", { id: "save" });
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
       );
-      const cropped = canvas.toDataURL("image/jpeg", 0.92);
-      setCropPhoto(null);
-      if (mode === "single") {
-        analyzeSingle(cropped);
-      } else {
-        analyzeCouple(cropped);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `colour-clash-score-${currentEntry.score}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Saved to downloads!", { id: "save" });
+    } catch (err) {
+      console.error("Save error:", err);
+      toast.error("Could not save image", { id: "save" });
+    }
+  }, [currentEntry, mode]);
+
+  const handleCopyLink = useCallback(() => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    navigator.clipboard
+      .writeText(
+        `My outfit scored ${currentEntry.score}/100 on Colour Clash! ${APP_LINK}`,
+      )
+      .then(() => toast.success("Link copied!"))
+      .catch(() => toast.error("Could not copy"));
+    setShowShareSheet(false);
+  }, [currentEntry]);
+
+  const handleWhatsApp = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    const text = encodeURIComponent(
+      `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
+    );
+    try {
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
       }
-    };
-    tempImg.src = cropPhoto;
-  };
-
-  const skipCrop = () => {
-    if (!cropPhoto) return;
-    const p = cropPhoto;
-    setCropPhoto(null);
-    if (mode === "single") {
-      analyzeSingle(p);
-    } else {
-      analyzeCouple(p);
+    } catch {
+      /* fallback */
     }
-  };
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+    setShowShareSheet(false);
+  }, [currentEntry, mode]);
 
-  const getEventXY = (e: React.MouseEvent | React.TouchEvent) => {
-    if ("touches" in e) {
-      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-    return { x: e.clientX, y: e.clientY };
-  };
+  const handleTwitter = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    const text = encodeURIComponent(
+      `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨`,
+    );
+    window.open(
+      `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(APP_LINK)}`,
+      "_blank",
+    );
+    setShowShareSheet(false);
+  }, [currentEntry]);
 
-  const handleCropMouseDown = (
-    e: React.MouseEvent | React.TouchEvent,
-    mode2: "drag" | "resize",
-  ) => {
-    e.stopPropagation();
-    const { x, y } = getEventXY(e);
-    dragStart.current = { mx: x, my: y, rx: cropRect.x, ry: cropRect.y };
-    if (mode2 === "drag") setIsDragging(true);
-    else setIsResizing(true);
-  };
-
-  const handleCropMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging && !isResizing) return;
-    const { x, y } = getEventXY(e);
-    const dx = x - dragStart.current.mx;
-    const dy = y - dragStart.current.my;
-    if (isDragging) {
-      setCropRect((prev) => ({
-        ...prev,
-        x: Math.max(0, dragStart.current.rx + dx),
-        y: Math.max(0, dragStart.current.ry + dy),
-      }));
-    } else {
-      setCropRect((prev) => ({
-        ...prev,
-        w: Math.max(60, prev.w + dx),
-        h: Math.max(60, prev.h + dy),
-      }));
-      dragStart.current.mx = x;
-      dragStart.current.my = y;
-    }
-  };
-
-  const handleCropMouseUp = () => {
-    setIsDragging(false);
-    setIsResizing(false);
-  };
-
-  const handleReset = () => {
-    setPhoto(null);
-    setCropPhoto(null);
-    setScore(null);
-    setCoupleData(null);
-    setViewEntry(null);
-    setNoPersonMsg(null);
+  const handleRetry = useCallback(() => {
+    setCroppedPhoto("");
+    setCropDataUrl("");
+    rawPhotoRef.current = "";
+    setCropBoxPos({ x: 0, y: 0 });
+    setScoreResult(null);
+    setCoupleResult(null);
+    setCurrentEntry(null);
+    setShowShareSheet(false);
     setPageState("idle");
-  };
+  }, []);
 
-  const handleDelete = (id: string) => {
-    setHistory((prev) => {
-      const updated = prev.filter((h) => h.id !== id);
-      saveHistory(historyKey, updated);
-      return updated;
-    });
-    toast.success("Removed from lookbook.");
-  };
+  const handleOpenLookbookEntry = useCallback((entry: LookbookEntry) => {
+    setCroppedPhoto(entry.photoDataUrl);
+    setScoreResult(entry.result);
+    setCoupleResult(entry.coupleResult ?? null);
+    setSkinTone(entry.skinTone ?? "medium");
+    setSelectedSkinTone(entry.skinTone ?? "medium");
+    setCurrentEntry(entry);
+    setLiked(getLikeState(entry.id));
+    setLikeCountState(getLikeCount(entry.id));
+    setMode(entry.mode);
+    setPageState("results");
+  }, []);
 
-  return (
-    <div className="flex flex-col gap-5 pb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-display font-bold text-2xl text-foreground">
-            Outfit Score
-          </h2>
+  // ---- Render helpers -------------------------------------------------------
+
+  const renderModeToggle = () => (
+    <div className="flex justify-center mb-4">
+      <div
+        className="relative flex bg-muted rounded-full p-0.5"
+        style={{ width: 200 }}
+        data-ocid="score.toggle"
+      >
+        <div
+          className="absolute top-0.5 bottom-0.5 w-1/2 rounded-full bg-primary shadow-sm transition-all duration-200"
+          style={{ left: mode === "single" ? "2px" : "50%" }}
+        />
+        {(["single", "couple"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`relative z-10 flex-1 py-1.5 text-xs font-semibold transition-colors duration-200 rounded-full flex items-center justify-center gap-1 ${
+              mode === m ? "text-primary-foreground" : "text-muted-foreground"
+            }`}
+            data-ocid={`score.${m}.tab`}
+          >
+            {m === "single" ? (
+              <User className="w-3 h-3" />
+            ) : (
+              <Users className="w-3 h-3" />
+            )}
+            {m === "single" ? "Single" : "Couple"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderIdle = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      className="flex flex-col gap-4"
+    >
+      {renderModeToggle()}
+
+      {/* Important note banner */}
+      <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+        <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-0.5">
+          📸 Important Note
+        </p>
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          Please upload a photo of a <strong>person only</strong> for best
+          results. This app works entirely on colour combinations and rates
+          based on your photo.
+        </p>
+      </div>
+
+      {/* Upload buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex flex-col items-center gap-2 p-6 rounded-2xl border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-all"
+          data-ocid="score.camera.button"
+        >
+          <Camera className="w-8 h-8 text-primary" />
+          <span className="text-sm font-semibold">Camera</span>
+          <span className="text-xs text-muted-foreground">Take a photo</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
+          className="flex flex-col items-center gap-2 p-6 rounded-2xl border-2 border-dashed border-primary/40 hover:border-primary hover:bg-primary/5 transition-all"
+          data-ocid="score.upload.button"
+        >
+          <Upload className="w-8 h-8 text-primary" />
+          <span className="text-sm font-semibold">Gallery</span>
+          <span className="text-xs text-muted-foreground">Upload photo</span>
+        </button>
+      </div>
+
+      {mode === "couple" && (
+        <p className="text-center text-xs text-muted-foreground bg-muted rounded-xl px-3 py-2">
+          📸 Upload one photo with both people visible for couple analysis
+        </p>
+      )}
+
+      {/* Hidden inputs */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+
+      {/* Lookbook */}
+      {lookbook.length > 0 && (
+        <div className="mt-2">
+          <h3 className="text-sm font-bold mb-2 text-foreground">
+            📖 Lookbook
+          </h3>
+          <div
+            className="flex gap-2 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none" }}
+            data-ocid="score.list"
+          >
+            {lookbook.map((entry, i) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => handleOpenLookbookEntry(entry)}
+                className="flex-shrink-0 relative rounded-xl overflow-hidden"
+                style={{ width: 72, height: 72 }}
+                data-ocid={`score.item.${i + 1}`}
+              >
+                <img
+                  src={entry.photoDataUrl}
+                  alt="lookbook"
+                  className="w-full h-full object-cover"
+                />
+                <div
+                  className="absolute bottom-1 right-1 rounded-full px-1.5 py-0.5 text-white text-[10px] font-bold"
+                  style={{ background: getScoreColor(entry.score) }}
+                >
+                  {entry.score}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+
+  const renderCropping = () => {
+    const containerW = Math.min(window.innerWidth - 48, 360);
+    const containerH = Math.round(containerW * 1.4);
+    const boxSize = Math.round(containerW * 0.8);
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0 }}
+        className="flex flex-col items-center gap-4"
+      >
+        {/* Heading */}
+        <div className="w-full">
+          <p className="text-sm font-bold text-foreground">
+            Position the crop box ✅
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            AI-powered fashion feedback
+            Drag the white box to select the area · 1:1 square
           </p>
         </div>
-        {onNavigateToSkinTone && (
+
+        {/* Crop container — full image visible, crop box draggable on top */}
+        <div
+          ref={cropContainerRef}
+          className="rounded-2xl border border-border/40 select-none shadow-lg"
+          style={{
+            width: containerW,
+            height: containerH,
+            position: "relative",
+            background: "#111",
+            overflow: "hidden",
+          }}
+          data-ocid="score.canvas_target"
+        >
+          {cropDataUrl && (
+            <img
+              src={cropDataUrl}
+              alt="crop preview"
+              draggable={false}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                userSelect: "none",
+                touchAction: "none",
+                display: "block",
+              }}
+            />
+          )}
+          {/* Dark overlay outside crop box */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.45) 100%)",
+              maskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${cropBoxPos.x} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y + boxSize} L${cropBoxPos.x} ${cropBoxPos.y + boxSize} Z")`,
+              WebkitMaskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${cropBoxPos.x} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y + boxSize} L${cropBoxPos.x} ${cropBoxPos.y + boxSize} Z")`,
+            }}
+          />
+          {/* Draggable crop box */}
+          <div
+            style={{
+              position: "absolute",
+              left: cropBoxPos.x,
+              top: cropBoxPos.y,
+              width: boxSize,
+              height: boxSize,
+              border: "2px solid rgba(255,255,255,0.9)",
+              borderRadius: 8,
+              cursor: "grab",
+              touchAction: "none",
+              zIndex: 10,
+            }}
+            onPointerDown={handleCropPointerDown}
+            onPointerMove={handleCropPointerMove}
+            onPointerUp={handleCropPointerUp}
+            onPointerCancel={handleCropPointerUp}
+          >
+            {/* Corner guides */}
+            <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-white rounded-tl" />
+            <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-white rounded-tr" />
+            <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-white rounded-bl" />
+            <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-white rounded-br" />
+          </div>
+        </div>
+
+        <div className="flex gap-3 w-full">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleRetry}
+            data-ocid="score.cancel_button"
+          >
+            ↩ Retake
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleCropConfirm}
+            data-ocid="score.confirm_button"
+          >
+            Crop & Analyse ✓
+          </Button>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const renderDetecting = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <LoadingPulse label="Checking for a person..." />
+    </motion.div>
+  );
+
+  const renderAnalyzing = () => (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <LoadingPulse label="Analysing your outfit..." />
+    </motion.div>
+  );
+
+  const renderError = () => (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex flex-col items-center gap-4 py-12 text-center"
+      data-ocid="score.error_state"
+    >
+      <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+        <AlertCircle className="w-8 h-8 text-destructive" />
+      </div>
+      <div>
+        <h3 className="font-bold text-lg mb-1">
+          {errorType === "no_person"
+            ? "No person detected!"
+            : errorType === "need_two_people"
+              ? "Two people needed"
+              : "Analysis failed"}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          {errorType === "no_person"
+            ? "Please upload or capture a photo of a person for an accurate score."
+            : errorType === "need_two_people"
+              ? "In Couple mode, please upload a photo with two people visible."
+              : "Something went wrong. Please try again."}
+        </p>
+      </div>
+      <Button onClick={handleRetry} data-ocid="score.retry.button">
+        <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+      </Button>
+    </motion.div>
+  );
+
+  const renderResults = () => {
+    const score = currentEntry?.score ?? scoreResult?.score ?? 72;
+    const isCouple = mode === "couple" && coupleResult != null;
+    const colorBarWidth = scoreResult
+      ? Math.round((scoreResult.colorScore / 40) * 100)
+      : Math.round((score / 100) * 100);
+    const fitBarWidth = scoreResult
+      ? Math.round((scoreResult.fitScore / 30) * 100)
+      : Math.round((score / 100) * 100);
+    const styleBarWidth = scoreResult
+      ? Math.round((scoreResult.styleScore / 30) * 100)
+      : Math.round((score / 100) * 100);
+    const showSkinSuggestions = score < 70;
+    const skinPalette = SKIN_TONE_PALETTES[selectedSkinTone];
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        className="flex flex-col gap-0"
+        data-ocid="score.card"
+      >
+        {/* Back button */}
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="flex items-center gap-1 text-xs text-muted-foreground mb-3 hover:text-foreground transition-colors"
+          data-ocid="score.back.button"
+        >
+          <ChevronLeft className="w-4 h-4" /> New analysis
+        </button>
+
+        {/* Instagram-style card */}
+        <div className="rounded-2xl overflow-hidden border border-border shadow-lg">
+          {/* Header: brand + avatar */}
+          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+            <div className="flex items-center gap-1.5">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 28 28"
+                fill="none"
+                aria-label="Colour Clash icon"
+                role="img"
+              >
+                <circle cx="10" cy="10" r="4" fill="#FF6B6B" />
+                <circle cx="18" cy="10" r="4" fill="#818CF8" />
+                <circle cx="10" cy="18" r="4" fill="#34D399" />
+                <circle cx="18" cy="18" r="4" fill="#FBBF24" />
+              </svg>
+              <span className="text-xs font-bold tracking-tight">
+                <span style={{ color: "#FF6B6B" }}>COLOUR</span>{" "}
+                <span style={{ color: "#1a1a1a", fontStyle: "italic" }}>
+                  CLASH
+                </span>
+              </span>
+            </div>
+            <div className="ml-auto w-7 h-7 rounded-full bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">
+              {userInitials}
+            </div>
+          </div>
+
+          {/* Photo area */}
+          <div className="relative" style={{ aspectRatio: "1/1" }}>
+            <img
+              ref={photoImgRef}
+              src={croppedPhoto}
+              alt="outfit"
+              className="w-full h-full object-cover block"
+            />
+            {/* Couple bounding boxes overlay */}
+            {isCouple && (
+              <canvas
+                ref={coupleCanvasRef}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                style={{ zIndex: 2 }}
+              />
+            )}
+            {/* Score badge */}
+            <div
+              className="absolute top-3 right-3 w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-lg"
+              style={{ background: getScoreColor(score), zIndex: 3 }}
+              data-ocid="score.panel"
+            >
+              <span className="text-white font-black text-xl leading-none">
+                {score}
+              </span>
+              <span className="text-white/80 text-[10px] font-bold">
+                Grade {getScoreGrade(score)}
+              </span>
+            </div>
+          </div>
+
+          {/* Score breakdown */}
+          <div className="px-3 py-3 border-t border-border flex flex-col gap-2">
+            {isCouple ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 rounded-full border-2 border-blue-400"
+                    style={{ background: coupleResult.person1Color }}
+                  />
+                  <span className="text-xs font-medium">
+                    P1: {coupleResult.person1Description}
+                  </span>
+                  <div
+                    className="w-4 h-4 rounded-full border-2 border-pink-400 ml-2"
+                    style={{ background: coupleResult.person2Color }}
+                  />
+                  <span className="text-xs font-medium">
+                    P2: {coupleResult.person2Description}
+                  </span>
+                </div>
+                <div className="text-sm font-medium">
+                  {coupleResult.harmonyAdvice}
+                </div>
+              </>
+            ) : (
+              <>
+                {[
+                  {
+                    label: "Color Harmony",
+                    val: colorBarWidth,
+                    raw: scoreResult?.colorScore ?? 0,
+                    max: 40,
+                  },
+                  {
+                    label: "Fit & Style",
+                    val: fitBarWidth,
+                    raw: scoreResult?.fitScore ?? 0,
+                    max: 30,
+                  },
+                  {
+                    label: "Trend",
+                    val: styleBarWidth,
+                    raw: scoreResult?.styleScore ?? 0,
+                    max: 30,
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-24 flex-shrink-0">
+                      {row.label}
+                    </span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${row.val}%`,
+                          background: getScoreColor(score),
+                        }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold w-10 text-right">
+                      {row.raw}/{row.max}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Analysis text */}
+          {scoreResult?.analysis && (
+            <div className="px-3 pb-2 text-xs text-muted-foreground italic">
+              {scoreResult.analysis}
+            </div>
+          )}
+
+          {/* Like + Save + Share row */}
+          <div className="px-3 py-2.5 border-t border-border flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              className="flex items-center gap-1 group"
+              data-ocid="score.toggle"
+            >
+              <Heart
+                className={`w-5 h-5 transition-all ${
+                  liked
+                    ? "fill-red-500 text-red-500 scale-110"
+                    : "text-muted-foreground group-hover:text-red-400"
+                }`}
+              />
+              <span className="text-xs font-semibold">{likeCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+              data-ocid="score.save.button"
+            >
+              <Download className="w-4 h-4" /> Save
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex items-center gap-1 ml-auto text-xs font-semibold text-primary hover:opacity-80 transition-opacity"
+              data-ocid="score.share.button"
+            >
+              <Share2 className="w-4 h-4" /> Share
+            </button>
+          </div>
+        </div>
+
+        {/* Suggestion */}
+        {scoreResult?.suggestion && (
+          <div className="mt-3 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/20">
+            <p className="text-xs font-semibold text-primary mb-0.5">
+              💡 Style Tip
+            </p>
+            <p className="text-xs text-foreground">{scoreResult.suggestion}</p>
+          </div>
+        )}
+        {isCouple && coupleResult.fixItSuggestion && (
+          <div className="mt-3 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-0.5">
+              🔧 Fix-It Suggestion
+            </p>
+            <p className="text-xs text-foreground">
+              {coupleResult.fixItSuggestion}
+            </p>
+          </div>
+        )}
+
+        {/* Skin tone section (score < 70) */}
+        {showSkinSuggestions && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4"
+            data-ocid="score.section"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold">🎨 Skin Tone Suggestions</h3>
+              <span className="text-xs text-muted-foreground">
+                Score below 70
+              </span>
+            </div>
+            <div className="flex items-center gap-1 mb-3">
+              <span className="text-xs text-muted-foreground mr-1">
+                Detected:
+              </span>
+              {(["fair", "wheatish", "medium", "dark"] as const).map((tone) => (
+                <button
+                  key={tone}
+                  type="button"
+                  onClick={() => setSelectedSkinTone(tone)}
+                  className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all capitalize ${
+                    selectedSkinTone === tone
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  }`}
+                  data-ocid="score.toggle"
+                >
+                  {tone === skinTone ? `${tone} ✓` : tone}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Colors that suit your {selectedSkinTone} skin tone:
+            </p>
+            <div className="grid grid-cols-6 gap-1.5">
+              {skinPalette.map((item) => (
+                <div
+                  key={item.name}
+                  className="flex flex-col items-center gap-0.5"
+                >
+                  <div
+                    className="w-10 h-10 rounded-full border-2 border-white shadow-md"
+                    style={{ background: item.color }}
+                  />
+                  <span className="text-[9px] text-center text-muted-foreground leading-tight">
+                    {item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Share sheet */}
+        <AnimatePresence>
+          {showShareSheet && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="mt-4 rounded-2xl border border-border p-4 flex flex-col gap-2"
+              data-ocid="score.popover"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-bold">Share your score</span>
+                <button
+                  type="button"
+                  onClick={() => setShowShareSheet(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  ×
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleWhatsApp}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-green-50 dark:bg-green-950/20 hover:bg-green-100 transition-colors"
+                data-ocid="score.share.button"
+              >
+                <SiWhatsapp className="w-5 h-5 text-green-600" />
+                <span className="text-sm font-medium">Share on WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleTwitter}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted hover:bg-muted/70 transition-colors"
+                data-ocid="score.share.button"
+              >
+                <SiX className="w-5 h-5" />
+                <span className="text-sm font-medium">
+                  Share on X (Twitter)
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted hover:bg-muted/70 transition-colors"
+                data-ocid="score.copy.button"
+              >
+                <Copy className="w-5 h-5" />
+                <span className="text-sm font-medium">Copy link</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
+
+  // ---- Main render ----------------------------------------------------------
+
+  return (
+    <div className="w-full max-w-md mx-auto pb-8 px-4 pt-2">
+      {/* Page header */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 28 28"
+            fill="none"
+            aria-label="Colour Clash icon"
+            role="img"
+          >
+            <circle cx="10" cy="10" r="4" fill="#FF6B6B" />
+            <circle cx="18" cy="10" r="4" fill="#818CF8" />
+            <circle cx="10" cy="18" r="4" fill="#34D399" />
+            <circle cx="18" cy="18" r="4" fill="#FBBF24" />
+          </svg>
+          <h1 className="text-base font-black tracking-tight">
+            <span style={{ color: "#FF6B6B" }}>Outfit</span>{" "}
+            <span style={{ fontStyle: "italic" }}>Score</span>
+          </h1>
+        </div>
+        {pageState === "results" && (
           <button
             type="button"
-            onClick={onNavigateToSkinTone}
-            className="text-xs rounded-xl border border-primary/30 text-primary px-3 py-1.5 flex items-center gap-1.5 hover:bg-primary/10 transition-colors"
-            data-ocid="outfit.secondary_button"
+            onClick={handleRetry}
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            data-ocid="score.secondary_button"
           >
-            <span>🎨</span> Skin Tone
+            <RefreshCw className="w-3.5 h-3.5" /> New
           </button>
         )}
       </div>
 
-      {/* Mode toggle */}
-      <div
-        className="flex gap-2 p-1 bg-muted rounded-2xl"
-        data-ocid="outfit.toggle"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setMode("single");
-            handleReset();
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            mode === "single"
-              ? "bg-background text-foreground shadow"
-              : "text-muted-foreground"
-          }`}
-          data-ocid="outfit.tab"
-        >
-          <User className="w-4 h-4" /> Single
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("couple");
-            handleReset();
-          }}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            mode === "couple"
-              ? "bg-background text-foreground shadow"
-              : "text-muted-foreground"
-          }`}
-          data-ocid="outfit.tab"
-        >
-          <Users className="w-4 h-4" /> Couple
-        </button>
-      </div>
-
-      {/* Lookbook view mode */}
       <AnimatePresence mode="wait">
-        {viewEntry && (
-          <motion.div
-            key="lookbook-view"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="flex flex-col gap-4"
-          >
-            <button
-              type="button"
-              onClick={() => setViewEntry(null)}
-              className="flex items-center gap-2 text-sm text-primary font-medium w-fit"
-              data-ocid="outfit.secondary_button"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back to Lookbook
-            </button>
-            <InstagramPostCard
-              photo={viewEntry.photoDataUrl}
-              score={viewEntry}
-              onReset={handleReset}
-              onRescan={() => {
-                setViewEntry(null);
-                analyzeSingle(viewEntry.photoDataUrl);
-              }}
-            />
-          </motion.div>
-        )}
+        {pageState === "idle" && renderIdle()}
+        {pageState === "cropping" && renderCropping()}
+        {pageState === "detecting" && renderDetecting()}
+        {pageState === "analyzing" && renderAnalyzing()}
+        {pageState === "results" && renderResults()}
+        {pageState === "error" && renderError()}
       </AnimatePresence>
-
-      {/* Main flow */}
-      {!viewEntry && (
-        <>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={handleCameraChange}
-          />
-          <input
-            ref={galleryInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleGalleryChange}
-            data-ocid="outfit.upload_button"
-          />
-
-          <AnimatePresence mode="wait">
-            {/* Camera preview step (no crop) */}
-            {pageState === "hasPhoto" && photo && !cropPhoto && (
-              <motion.div
-                key="camera-preview"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                className="ios-card overflow-hidden"
-                data-ocid="outfit.card"
-              >
-                <div className="px-4 py-3 bg-muted/20 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">
-                    📷 Photo ready
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Tap Analyse to score
-                  </p>
-                </div>
-                <img
-                  src={photo}
-                  alt="captured"
-                  className="w-full object-contain"
-                  style={{ maxHeight: 360, display: "block" }}
-                />
-                <div className="flex gap-2 p-3">
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="flex-1 rounded-2xl border border-border py-2.5 text-sm text-muted-foreground"
-                    data-ocid="outfit.secondary_button"
-                  >
-                    📷 Retake
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      mode === "single"
-                        ? analyzeSingle(photo)
-                        : analyzeCouple(photo)
-                    }
-                    className="flex-1 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-semibold"
-                    data-ocid="outfit.primary_button"
-                  >
-                    ✓ Analyse
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Crop step */}
-            {cropPhoto && pageState === "hasPhoto" && (
-              <motion.div
-                key="crop"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                className="ios-card overflow-hidden"
-                data-ocid="outfit.card"
-              >
-                <div className="px-4 py-3 bg-muted/20 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">
-                    Crop your photo
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Drag box · corner to resize
-                  </p>
-                </div>
-                <div
-                  className="relative select-none overflow-hidden"
-                  style={{
-                    maxHeight: 360,
-                    cursor: isDragging ? "grabbing" : "default",
-                  }}
-                  onMouseMove={handleCropMouseMove}
-                  onMouseUp={handleCropMouseUp}
-                  onTouchMove={handleCropMouseMove}
-                  onTouchEnd={handleCropMouseUp}
-                >
-                  <img
-                    ref={cropImgRef}
-                    src={cropPhoto}
-                    alt="crop"
-                    className="w-full object-contain"
-                    style={{ maxHeight: 360, display: "block" }}
-                    draggable={false}
-                  />
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{ background: "rgba(0,0,0,0.45)" }}
-                  />
-                  <div
-                    className="absolute border-2 border-white/90"
-                    style={{
-                      left: cropRect.x,
-                      top: cropRect.y,
-                      width: cropRect.w,
-                      height: cropRect.h,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
-                      cursor: "grab",
-                    }}
-                    onMouseDown={(e) => handleCropMouseDown(e, "drag")}
-                    onTouchStart={(e) => handleCropMouseDown(e, "drag")}
-                  >
-                    <div
-                      className="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-tl-md cursor-se-resize flex items-center justify-center"
-                      style={{ fontSize: 10, color: "#333" }}
-                      onMouseDown={(e) => handleCropMouseDown(e, "resize")}
-                      onTouchStart={(e) => handleCropMouseDown(e, "resize")}
-                    >
-                      ⇡
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 p-3">
-                  <button
-                    type="button"
-                    onClick={skipCrop}
-                    className="flex-1 rounded-2xl border border-border py-2.5 text-sm text-muted-foreground"
-                    data-ocid="outfit.secondary_button"
-                  >
-                    Skip Crop
-                  </button>
-                  <button
-                    type="button"
-                    onClick={applyCrop}
-                    className="flex-1 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-semibold"
-                    data-ocid="outfit.primary_button"
-                  >
-                    ✓ Crop &amp; Analyse
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Detecting / analyzing spinner */}
-            {(pageState === "detecting" || pageState === "analyzing") && (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="ios-card"
-              >
-                <LoadingPulse message={loadingMsg} />
-              </motion.div>
-            )}
-
-            {/* Error / no person detected */}
-            {pageState === "error" && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                className="ios-card flex flex-col items-center gap-4 py-12 px-6 text-center"
-                data-ocid="outfit.error_state"
-              >
-                <AlertCircle className="w-10 h-10 text-amber-500" />
-                <div>
-                  <p className="font-semibold text-foreground">
-                    {noPersonMsg
-                      ? "No Person Detected"
-                      : "Something went wrong"}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {noPersonMsg ??
-                      "We couldn't analyse your photo. Please try again."}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="rounded-2xl bg-primary text-primary-foreground px-6 py-2.5 text-sm font-semibold"
-                  data-ocid="outfit.primary_button"
-                >
-                  Try Again
-                </button>
-              </motion.div>
-            )}
-
-            {/* Results: single mode */}
-            {pageState === "results" && photo && score && mode === "single" && (
-              <motion.div
-                key="result-single"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <InstagramPostCard
-                  photo={photo}
-                  score={score}
-                  onReset={handleReset}
-                  onRescan={() => analyzeSingle(photo)}
-                />
-              </motion.div>
-            )}
-
-            {/* Results: couple mode */}
-            {pageState === "results" &&
-              photo &&
-              coupleData &&
-              mode === "couple" && (
-                <motion.div
-                  key="result-couple"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <CoupleResultCard
-                    photo={photo}
-                    person1Color={coupleData.person1Color}
-                    person2Color={coupleData.person2Color}
-                    person1Desc={coupleData.person1Desc}
-                    person2Desc={coupleData.person2Desc}
-                    onReset={handleReset}
-                  />
-                </motion.div>
-              )}
-
-            {/* Upload UI: idle state */}
-            {pageState === "idle" && (
-              <motion.div
-                key="upload"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                className="ios-card"
-              >
-                <div
-                  className="flex flex-col items-center gap-4 py-10 w-full px-6"
-                  data-ocid="outfit.dropzone"
-                >
-                  <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-dashed border-primary/40 flex items-center justify-center">
-                    {mode === "couple" ? (
-                      <Users className="w-10 h-10 text-primary/60" />
-                    ) : (
-                      <Camera className="w-10 h-10 text-primary/60" />
-                    )}
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold text-foreground text-lg">
-                      {mode === "couple"
-                        ? "Score Couple Harmony"
-                        : "Score Your Outfit"}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {mode === "couple"
-                        ? "Upload a photo with both people visible for couple colour harmony scoring"
-                        : "Take a photo or pick from gallery for instant AI scoring"}
-                    </p>
-                  </div>
-                  <div className="flex gap-3 w-full max-w-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (cameraInputRef.current) {
-                          cameraInputRef.current.click();
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary text-primary-foreground py-3 text-sm font-semibold"
-                      data-ocid="outfit.primary_button"
-                    >
-                      <Camera className="w-4 h-4" /> Camera
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (galleryInputRef.current) {
-                          galleryInputRef.current.click();
-                        }
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-2xl border border-primary/30 text-primary py-3 text-sm font-semibold"
-                      data-ocid="outfit.upload_button"
-                    >
-                      <Upload className="w-4 h-4" /> Gallery
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
-
-      {/* Lookbook / History */}
-      {!viewEntry && history.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-foreground text-base">
-              Lookbook
-            </h3>
-            <Badge variant="secondary" className="text-xs">
-              {history.length} entries
-            </Badge>
-          </div>
-          <div className="flex flex-col gap-2">
-            <AnimatePresence>
-              {history.map((entry) => (
-                <HistoryCard
-                  key={entry.id}
-                  entry={entry}
-                  onDelete={handleDelete}
-                  onView={setViewEntry}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
-
-      {!viewEntry && history.length === 0 && pageState === "idle" && (
-        <div
-          className="text-center py-8 text-muted-foreground"
-          data-ocid="outfit.empty_state"
-        >
-          <p className="text-3xl mb-2">📸</p>
-          <p className="text-sm">Your lookbook is empty.</p>
-          <p className="text-xs mt-1">
-            Score an outfit to start your style diary.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
