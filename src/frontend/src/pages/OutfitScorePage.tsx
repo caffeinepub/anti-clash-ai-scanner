@@ -1175,17 +1175,16 @@ export default function OutfitScorePage({
     }
   };
 
-  const handleCameraChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
-      if (mode === "single") {
-        analyzeSingle(dataUrl);
-      } else {
-        analyzeCouple(dataUrl);
-      }
+      if (!dataUrl) return;
+      setPhoto(dataUrl);
+      setCropPhoto(null);
+      setPageState("hasPhoto");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -1430,6 +1429,55 @@ export default function OutfitScorePage({
           />
 
           <AnimatePresence mode="wait">
+            {/* Camera preview step (no crop) */}
+            {pageState === "hasPhoto" && photo && !cropPhoto && (
+              <motion.div
+                key="camera-preview"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                className="ios-card overflow-hidden"
+                data-ocid="outfit.card"
+              >
+                <div className="px-4 py-3 bg-muted/20 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">
+                    📷 Photo ready
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tap Analyse to score
+                  </p>
+                </div>
+                <img
+                  src={photo}
+                  alt="captured"
+                  className="w-full object-contain"
+                  style={{ maxHeight: 360, display: "block" }}
+                />
+                <div className="flex gap-2 p-3">
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="flex-1 rounded-2xl border border-border py-2.5 text-sm text-muted-foreground"
+                    data-ocid="outfit.secondary_button"
+                  >
+                    📷 Retake
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      mode === "single"
+                        ? analyzeSingle(photo)
+                        : analyzeCouple(photo)
+                    }
+                    className="flex-1 rounded-2xl bg-primary text-primary-foreground py-2.5 text-sm font-semibold"
+                    data-ocid="outfit.primary_button"
+                  >
+                    ✓ Analyse
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
             {/* Crop step */}
             {cropPhoto && pageState === "hasPhoto" && (
               <motion.div
