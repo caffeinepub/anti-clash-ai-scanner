@@ -1,95 +1,88 @@
 import { Badge } from "@/components/ui/badge";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import ColorPaletteCard from "../components/ColorPaletteCard";
 
 const RETAILERS = [
   {
     key: "amazon",
     name: "Amazon",
-    emoji: "🟠",
     color: "#FF9900",
     deal: "Great Indian Sale",
     discount: "Up to 70% off on fashion",
     url: "https://www.amazon.in/deals",
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    border: "border-orange-200 dark:border-orange-800",
+    paletteHex: "#FF9900",
+    category: "top",
   },
   {
     key: "flipkart",
     name: "Flipkart",
-    emoji: "🔵",
     color: "#2874F0",
     deal: "Big Fashion Sale",
     discount: "Flat 50–80% off",
     url: "https://www.flipkart.com/offers-store",
-    bg: "bg-blue-50 dark:bg-blue-950/30",
-    border: "border-blue-200 dark:border-blue-800",
+    paletteHex: "#2874F0",
+    category: "bottom",
   },
   {
     key: "myntra",
     name: "Myntra",
-    emoji: "🩷",
     color: "#FF3F6C",
     deal: "End of Reason Sale",
     discount: "Min 50% off on top brands",
     url: "https://www.myntra.com/sale",
-    bg: "bg-pink-50 dark:bg-pink-950/30",
-    border: "border-pink-200 dark:border-pink-800",
+    paletteHex: "#FF3F6C",
+    category: "jacket",
   },
   {
     key: "ajio",
     name: "Ajio",
-    emoji: "🔴",
     color: "#DC2626",
     deal: "Big Bold Sale",
     discount: "Up to 75% off",
     url: "https://www.ajio.com/sale",
-    bg: "bg-red-50 dark:bg-red-950/30",
-    border: "border-red-200 dark:border-red-800",
+    paletteHex: "#DC2626",
+    category: "ethnic",
   },
   {
     key: "meesho",
     name: "Meesho",
-    emoji: "🩵",
     color: "#0D9488",
     deal: "Mega Sale",
-    discount: "Starting ₹99 — best value picks",
-    url: "https://www.meesho.com/sale",
-    bg: "bg-teal-50 dark:bg-teal-950/30",
-    border: "border-teal-200 dark:border-teal-800",
+    discount: "Starting ₹99 — best value",
+    url: "https://www.meesho.com",
+    paletteHex: "#0D9488",
+    category: "accessories",
   },
   {
     key: "nykaa",
     name: "Nykaa Fashion",
-    emoji: "🌸",
     color: "#FC2779",
     deal: "Fashion Festival",
     discount: "Up to 60% off on ethnic & western",
-    url: "https://www.nykaa.com/search/result/?q=sale+offers",
-    bg: "bg-rose-50 dark:bg-rose-950/30",
-    border: "border-rose-200 dark:border-rose-800",
+    url: "https://www.nykaa.com/fashion",
+    paletteHex: "#FC2779",
+    category: "bag",
   },
   {
     key: "indya",
     name: "House of Indya",
-    emoji: "🌺",
     color: "#9B2335",
     deal: "Ethnic Fiesta",
     discount: "Upto 40% off on kurtas & sarees",
     url: "https://www.houseofindya.com/sale",
-    bg: "bg-rose-50 dark:bg-rose-950/20",
-    border: "border-rose-300 dark:border-rose-900",
+    paletteHex: "#9B2335",
+    category: "ethnic",
   },
   {
     key: "offduty",
     name: "Offduty India",
-    emoji: "🟤",
     color: "#8B6914",
     deal: "Casuals Sale",
     discount: "Min 30% off on everyday wear",
-    url: "https://offduty.in/sale",
-    bg: "bg-yellow-50 dark:bg-yellow-950/30",
-    border: "border-yellow-200 dark:border-yellow-800",
+    url: "https://offduty.in/collections",
+    paletteHex: "#8B6914",
+    category: "shoes",
   },
 ];
 
@@ -112,7 +105,6 @@ const CATEGORIES: Category[] = [
 ];
 
 interface SimulatedDeal {
-  emoji: string;
   name: string;
   originalPrice: number;
   salePrice: number;
@@ -120,13 +112,13 @@ interface SimulatedDeal {
   retailer: string;
   retailerColor: string;
   category: Category;
-  searchQuery: string;
   retailerUrl: string;
+  paletteHex: string;
+  itemCategory: string;
 }
 
 const SIMULATED_DEALS: SimulatedDeal[] = [
   {
-    emoji: "👕",
     name: "Floral Printed Shirt",
     originalPrice: 2499,
     salePrice: 699,
@@ -134,11 +126,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Myntra",
     retailerColor: "#FF3F6C",
     category: "Tops",
-    searchQuery: "floral+printed+shirt",
     retailerUrl: "https://www.myntra.com/floral+printed+shirt",
+    paletteHex: "#E8A4B8",
+    itemCategory: "top",
   },
   {
-    emoji: "👖",
     name: "Slim Fit Jeans",
     originalPrice: 3499,
     salePrice: 999,
@@ -146,11 +138,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Amazon",
     retailerColor: "#FF9900",
     category: "Bottoms",
-    searchQuery: "slim+fit+jeans",
     retailerUrl: "https://www.amazon.in/s?k=slim+fit+jeans",
+    paletteHex: "#4A7FB5",
+    itemCategory: "bottom",
   },
   {
-    emoji: "🥻",
     name: "Silk Banarasi Saree",
     originalPrice: 5999,
     salePrice: 1799,
@@ -158,12 +150,12 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "House of Indya",
     retailerColor: "#9B2335",
     category: "Ethnic",
-    searchQuery: "silk+banarasi+saree",
     retailerUrl:
       "https://www.houseofindya.com/catalogsearch/result?q=silk+banarasi+saree",
+    paletteHex: "#9B2335",
+    itemCategory: "ethnic",
   },
   {
-    emoji: "👟",
     name: "Casual Sneakers",
     originalPrice: 4999,
     salePrice: 1299,
@@ -171,11 +163,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Flipkart",
     retailerColor: "#2874F0",
     category: "Footwear",
-    searchQuery: "casual+sneakers",
     retailerUrl: "https://www.flipkart.com/search?q=casual+sneakers",
+    paletteHex: "#FFFFFF",
+    itemCategory: "shoes",
   },
   {
-    emoji: "👜",
     name: "Tote Handbag",
     originalPrice: 2999,
     salePrice: 899,
@@ -183,11 +175,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Nykaa Fashion",
     retailerColor: "#FC2779",
     category: "Bags",
-    searchQuery: "tote+handbag",
     retailerUrl: "https://www.nykaa.com/search/result/?q=tote+handbag",
+    paletteHex: "#C4A882",
+    itemCategory: "bag",
   },
   {
-    emoji: "⌚",
     name: "Analog Wrist Watch",
     originalPrice: 3999,
     salePrice: 899,
@@ -195,11 +187,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Amazon",
     retailerColor: "#FF9900",
     category: "Accessories",
-    searchQuery: "analog+wrist+watch",
     retailerUrl: "https://www.amazon.in/s?k=analog+wrist+watch",
+    paletteHex: "#D4A853",
+    itemCategory: "watch",
   },
   {
-    emoji: "🧥",
     name: "Denim Jacket",
     originalPrice: 3499,
     salePrice: 1099,
@@ -207,11 +199,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Ajio",
     retailerColor: "#DC2626",
     category: "Tops",
-    searchQuery: "denim+jacket",
     retailerUrl: "https://www.ajio.com/search/?text=denim+jacket",
+    paletteHex: "#4A7FB5",
+    itemCategory: "jacket",
   },
   {
-    emoji: "👗",
     name: "Flared Midi Dress",
     originalPrice: 2799,
     salePrice: 799,
@@ -219,11 +211,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Myntra",
     retailerColor: "#FF3F6C",
     category: "Tops",
-    searchQuery: "flared+midi+dress",
     retailerUrl: "https://www.myntra.com/flared+midi+dress",
+    paletteHex: "#E8A0BF",
+    itemCategory: "top",
   },
   {
-    emoji: "🕶️",
     name: "UV400 Sunglasses",
     originalPrice: 1999,
     salePrice: 499,
@@ -231,11 +223,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Meesho",
     retailerColor: "#0D9488",
     category: "Accessories",
-    searchQuery: "uv400+sunglasses",
     retailerUrl: "https://www.meesho.com/search?q=uv400+sunglasses",
+    paletteHex: "#2D3748",
+    itemCategory: "accessories",
   },
   {
-    emoji: "🩱",
     name: "Cotton Anarkali Kurta",
     originalPrice: 2499,
     salePrice: 699,
@@ -243,12 +235,12 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "House of Indya",
     retailerColor: "#9B2335",
     category: "Ethnic",
-    searchQuery: "cotton+anarkali+kurta",
     retailerUrl:
       "https://www.houseofindya.com/catalogsearch/result?q=cotton+anarkali+kurta",
+    paletteHex: "#E8B4A0",
+    itemCategory: "ethnic",
   },
   {
-    emoji: "👠",
     name: "Block Heel Sandals",
     originalPrice: 3299,
     salePrice: 899,
@@ -256,11 +248,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Nykaa Fashion",
     retailerColor: "#FC2779",
     category: "Footwear",
-    searchQuery: "block+heel+sandals",
     retailerUrl: "https://www.nykaa.com/search/result/?q=block+heel+sandals",
+    paletteHex: "#C4A882",
+    itemCategory: "shoes",
   },
   {
-    emoji: "🧣",
     name: "Cashmere Scarf",
     originalPrice: 1999,
     salePrice: 599,
@@ -268,11 +260,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Offduty India",
     retailerColor: "#8B6914",
     category: "Accessories",
-    searchQuery: "cashmere+scarf",
     retailerUrl: "https://offduty.in/search?type=product&q=cashmere+scarf",
+    paletteHex: "#8B6914",
+    itemCategory: "accessories",
   },
   {
-    emoji: "👒",
     name: "Summer Straw Hat",
     originalPrice: 1499,
     salePrice: 399,
@@ -280,11 +272,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Amazon",
     retailerColor: "#FF9900",
     category: "Accessories",
-    searchQuery: "summer+straw+hat",
     retailerUrl: "https://www.amazon.in/s?k=summer+straw+hat",
+    paletteHex: "#D4B483",
+    itemCategory: "accessories",
   },
   {
-    emoji: "👖",
     name: "Palazzo Pants",
     originalPrice: 1799,
     salePrice: 499,
@@ -292,11 +284,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Meesho",
     retailerColor: "#0D9488",
     category: "Bottoms",
-    searchQuery: "palazzo+pants",
     retailerUrl: "https://www.meesho.com/search?q=palazzo+pants",
+    paletteHex: "#0D9488",
+    itemCategory: "bottom",
   },
   {
-    emoji: "👜",
     name: "Mini Sling Bag",
     originalPrice: 2299,
     salePrice: 699,
@@ -304,11 +296,11 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Flipkart",
     retailerColor: "#2874F0",
     category: "Bags",
-    searchQuery: "mini+sling+bag",
     retailerUrl: "https://www.flipkart.com/search?q=mini+sling+bag",
+    paletteHex: "#2874F0",
+    itemCategory: "bag",
   },
   {
-    emoji: "👟",
     name: "Ethnic Juttis",
     originalPrice: 1999,
     salePrice: 549,
@@ -316,8 +308,9 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "Ajio",
     retailerColor: "#DC2626",
     category: "Footwear",
-    searchQuery: "ethnic+juttis",
     retailerUrl: "https://www.ajio.com/search/?text=ethnic+juttis",
+    paletteHex: "#8B2020",
+    itemCategory: "shoes",
   },
 ];
 
@@ -355,148 +348,9 @@ export default function BestDealsPage() {
             style={{
               background:
                 "linear-gradient(135deg, #FF006E 0%, #FB5607 35%, #FFBE0B 70%, #FF006E 100%)",
-              backgroundSize: "200% 200%",
             }}
             data-ocid="deals.card"
           >
-            {/* Animated sparkles */}
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "21%", left: "18%", fontSize: "20px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 2.5,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 0.0,
-              }}
-            >
-              ✨
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "32%", left: "31%", fontSize: "16px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 2.9,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 0.3,
-              }}
-            >
-              ⭐
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "10%", left: "44%", fontSize: "28px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 3.3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 0.6,
-              }}
-            >
-              🌟
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "43%", left: "57%", fontSize: "20px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 3.7,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 0.9,
-              }}
-            >
-              💫
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "54%", left: "70%", fontSize: "16px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 4.1,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 1.2,
-              }}
-            >
-              ✦
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "65%", left: "83%", fontSize: "28px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 4.5,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 1.5,
-              }}
-            >
-              ★
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "76%", left: "18%", fontSize: "20px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 4.9,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 1.8,
-              }}
-            >
-              🔥
-            </motion.div>
-            <motion.div
-              className="absolute text-white/60 select-none pointer-events-none"
-              style={{ top: "21%", left: "57%", fontSize: "28px" }}
-              animate={{
-                y: [0, -8, 0],
-                opacity: [0.4, 1, 0.4],
-                rotate: [0, 15, 0],
-              }}
-              transition={{
-                duration: 5.3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-                delay: 2.1,
-              }}
-            >
-              💥
-            </motion.div>
-
             <div className="relative z-10 p-6 pb-5">
               <button
                 type="button"
@@ -506,39 +360,28 @@ export default function BestDealsPage() {
               >
                 ×
               </button>
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{
-                  delay: 0.15,
-                  type: "spring",
-                  stiffness: 400,
-                  damping: 28,
-                }}
-              >
-                <p className="text-white/80 text-sm font-semibold mb-1 tracking-wide">
-                  🎨 COLOUR CLASH EXCLUSIVE
-                </p>
-                <h1 className="text-white font-display font-black text-3xl leading-tight mb-2">
-                  Today&apos;s Best Deals 🔥
-                </h1>
-                <p className="text-white/90 text-sm leading-relaxed mb-3">
-                  Thank you for being part of the Colour Clash family!
-                  <br />
-                  We&apos;ve curated the hottest deals just for you. ❤️
-                </p>
-                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                  <span className="text-white text-xs font-bold">
-                    🙌 You&apos;re awesome for downloading this app!
-                  </span>
-                </div>
-              </motion.div>
+              <p className="text-white/80 text-sm font-semibold mb-1 tracking-wide">
+                🎨 COLOUR CLASH EXCLUSIVE
+              </p>
+              <h1 className="text-white font-display font-black text-3xl leading-tight mb-2">
+                Today&apos;s Best Deals 🔥
+              </h1>
+              <p className="text-white/90 text-sm leading-relaxed mb-3">
+                Thank you for being part of the Colour Clash family!
+                <br />
+                We&apos;ve curated the hottest deals just for you. ❤️
+              </p>
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                <span className="text-white text-xs font-bold">
+                  🙌 You&apos;re awesome for downloading this app!
+                </span>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Featured Deals */}
+      {/* Featured Deals - Color Palette style */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <h2 className="font-display font-bold text-base text-foreground">
@@ -548,7 +391,6 @@ export default function BestDealsPage() {
             8 stores
           </Badge>
         </div>
-        {/* Featured Sales Disclaimer */}
         <div className="flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
           <span className="text-sm mt-0.5">ℹ️</span>
           <p className="text-xs leading-relaxed">
@@ -556,51 +398,42 @@ export default function BestDealsPage() {
             point you to the right place, the rest is fashion magic. ✨
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Color palette grid for retailers */}
+        <div
+          className="flex gap-3 overflow-x-auto pb-2"
+          style={{ scrollbarWidth: "none" }}
+        >
           {RETAILERS.map((r, i) => (
-            <motion.a
+            <motion.div
               key={r.key}
-              href={r.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`rounded-2xl p-3.5 border flex flex-col gap-2 active:scale-95 transition-all ${r.bg} ${r.border}`}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: i * 0.06,
-                type: "spring",
-                stiffness: 360,
-                damping: 30,
-              }}
-              data-ocid={`deals.item.${i + 1}`}
+              transition={{ delay: i * 0.05 }}
+              className="flex flex-col items-center gap-2 flex-shrink-0"
             >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-base font-black flex-shrink-0"
-                  style={{ backgroundColor: r.color }}
-                >
-                  {r.emoji}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-foreground leading-tight truncate">
-                    {r.name}
-                  </p>
-                  <p className="text-[9px] text-muted-foreground">{r.deal}</p>
-                </div>
-              </div>
-              <p
-                className="text-[11px] font-semibold"
-                style={{ color: r.color }}
+              <a
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-ocid={`deals.item.${i + 1}`}
+                style={{ display: "block" }}
               >
-                {r.discount}
-              </p>
-              <div
-                className="rounded-xl py-1.5 text-center text-[11px] font-black text-white"
-                style={{ backgroundColor: r.color }}
+                <ColorPaletteCard
+                  hex={r.paletteHex}
+                  label={r.name}
+                  category={r.category}
+                  harmony={r.discount}
+                  size="lg"
+                />
+              </a>
+              <span
+                className="text-[9px] font-bold text-center"
+                style={{ color: r.color, maxWidth: 100, textAlign: "center" }}
               >
-                Shop Now →
-              </div>
-            </motion.a>
+                {r.deal}
+              </span>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -629,7 +462,7 @@ export default function BestDealsPage() {
         </div>
       </div>
 
-      {/* Simulated Deals Grid */}
+      {/* Hot Picks - Color Palette design */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <h2 className="font-display font-bold text-base text-foreground">
@@ -639,7 +472,6 @@ export default function BestDealsPage() {
             {filteredDeals.length} deals
           </Badge>
         </div>
-        {/* Hot Picks Disclaimer */}
         <div className="flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
           <span className="text-sm mt-0.5">ℹ️</span>
           <p className="text-xs leading-relaxed">
@@ -648,6 +480,7 @@ export default function BestDealsPage() {
             shopping! 💛
           </p>
         </div>
+
         <AnimatePresence mode="wait">
           <motion.div
             key={activeCategory}
@@ -655,66 +488,55 @@ export default function BestDealsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="grid grid-cols-2 gap-3"
+            className="grid grid-cols-2 gap-4"
           >
             {filteredDeals.map((deal, i) => (
               <motion.div
                 key={`${deal.name}-${deal.retailer}`}
                 initial={{ opacity: 0, scale: 0.94 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{
-                  delay: i * 0.04,
-                  type: "spring",
-                  stiffness: 360,
-                  damping: 30,
-                }}
-                className="ios-card overflow-hidden"
+                transition={{ delay: i * 0.04 }}
+                className="flex flex-col gap-2"
                 data-ocid={`deals.item.${i + 1}`}
               >
-                <div
-                  className="h-1.5 w-full"
-                  style={{ backgroundColor: deal.retailerColor }}
-                />
-                <div className="p-3">
-                  <div className="flex items-start justify-between gap-1 mb-2">
-                    <div>
-                      <span className="text-2xl">{deal.emoji}</span>
-                    </div>
+                {/* Color palette card */}
+                <a
+                  href={deal.retailerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "block" }}
+                >
+                  <ColorPaletteCard
+                    hex={deal.paletteHex}
+                    label={deal.name}
+                    category={deal.itemCategory}
+                    harmony={`${deal.discountPct}% OFF`}
+                    size="lg"
+                  />
+                </a>
+                {/* Deal info below card */}
+                <div>
+                  <div className="flex items-center justify-between">
                     <span
-                      className="text-[9px] font-black rounded-full px-1.5 py-0.5 text-white"
-                      style={{ backgroundColor: "#DC2626" }}
-                    >
-                      {deal.discountPct}% OFF
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-bold text-foreground leading-tight mb-1.5 line-clamp-2">
-                    {deal.name}
-                  </p>
-                  <div className="mb-2">
-                    <span className="text-xs font-black text-foreground">
-                      ₹{deal.salePrice.toLocaleString()}
-                    </span>{" "}
-                    <span className="text-[10px] text-muted-foreground line-through">
-                      ₹{deal.originalPrice.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-1">
-                    <span
-                      className="text-[8px] font-bold rounded-full px-1.5 py-0.5 text-white"
+                      className="text-[9px] font-bold rounded-full px-1.5 py-0.5 text-white"
                       style={{ backgroundColor: deal.retailerColor }}
                     >
                       {deal.retailer}
                     </span>
-                    <a
-                      href={deal.retailerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-black rounded-lg px-2 py-1 text-white transition-opacity hover:opacity-80"
-                      style={{ backgroundColor: deal.retailerColor }}
-                      data-ocid="deals.button"
-                    >
-                      Grab →
-                    </a>
+                    <span className="text-[9px] font-black text-red-500">
+                      {deal.discountPct}% OFF
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-semibold text-foreground mt-1 leading-tight line-clamp-2">
+                    {deal.name}
+                  </p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-xs font-black text-foreground">
+                      ₹{deal.salePrice.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground line-through">
+                      ₹{deal.originalPrice.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </motion.div>
@@ -723,11 +545,11 @@ export default function BestDealsPage() {
         </AnimatePresence>
       </div>
 
-      {/* Bottom motivational message */}
+      {/* Footer */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, type: "spring", stiffness: 300, damping: 28 }}
+        transition={{ delay: 0.3 }}
         className="rounded-3xl p-5 text-center"
         style={{
           background:

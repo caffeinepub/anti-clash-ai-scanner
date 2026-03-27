@@ -324,7 +324,9 @@ function EmailVerificationCard({
   );
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({
+  onClose: _onClose,
+}: { onClose?: () => void }) {
   const { actor } = useActor();
   const { identity, clear } = useInternetIdentity();
   const { userProfile, isLoadingProfile, refreshProfile } = useUserProfile();

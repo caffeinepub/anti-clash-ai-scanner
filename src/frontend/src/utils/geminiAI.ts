@@ -16,6 +16,7 @@ const _k = () =>
   atob(_a[5]) +
   atob(_a[6]);
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${_k()}`;
+const GEMINI_FLASH_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${_k()}`;
 
 export interface GeminiOutfit {
   title: string;
@@ -34,7 +35,6 @@ export interface GeminiAdvice {
 }
 
 function extractJson(text: string): string {
-  // Try to pull out a JSON block from markdown or raw text
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) return fenceMatch[1].trim();
   const braceStart = text.indexOf("{");
@@ -167,5 +167,195 @@ export async function generateGarmentImage(
     return null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Detect if there is a human person visible in the image.
+ * Returns 'YES', 'NO', or throws on error.
+ */
+export async function detectHuman(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<"YES" | "NO"> {
+  try {
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: "Look at this image. Is there a human person visible? Reply with only 'YES' or 'NO'.",
+              },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0, maxOutputTokens: 5 },
+      }),
+    });
+    if (!res.ok) return "YES"; // default allow on error
+    const data = await res.json();
+    const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+      .trim()
+      .toUpperCase();
+    return text.startsWith("YES") ? "YES" : "NO";
+  } catch {
+    return "YES"; // default allow on error
+  }
+}
+
+/**
+ * Detect how many people are in a couple photo.
+ * Returns 'YES_TWO', 'YES_ONE', or 'NO'.
+ */
+export async function detectCoupleInPhoto(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<"YES_TWO" | "YES_ONE" | "NO"> {
+  try {
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: "Look at this image. Are there two people visible? Reply with only 'YES_TWO', 'YES_ONE', or 'NO'.",
+              },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0, maxOutputTokens: 10 },
+      }),
+    });
+    if (!res.ok) return "YES_TWO";
+    const data = await res.json();
+    const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+      .trim()
+      .toUpperCase();
+    if (text.includes("YES_TWO")) return "YES_TWO";
+    if (text.includes("YES_ONE")) return "YES_ONE";
+    return "NO";
+  } catch {
+    return "YES_TWO";
+  }
+}
+
+export interface CoupleColors {
+  person1Color: string;
+  person2Color: string;
+  person1Description: string;
+  person2Description: string;
+}
+
+/**
+ * Extract dominant clothing colors for two people in a photo.
+ */
+export async function extractCoupleColors(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<CoupleColors> {
+  const fallback: CoupleColors = {
+    person1Color: "#3B82F6",
+    person2Color: "#F59E0B",
+    person1Description: "Blue",
+    person2Description: "Amber",
+  };
+  try {
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: 'Look at this image. Extract the dominant clothing color for the person on the LEFT side and the person on the RIGHT side. Return ONLY valid JSON: {"person1Color": "#hexcode", "person2Color": "#hexcode", "person1Description": "color name", "person2Description": "color name"}',
+              },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 100 },
+      }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const json = extractJson(raw);
+    const parsed = JSON.parse(json) as CoupleColors;
+    // Validate hex codes
+    if (!/^#[0-9a-fA-F]{6}$/.test(parsed.person1Color))
+      parsed.person1Color = fallback.person1Color;
+    if (!/^#[0-9a-fA-F]{6}$/.test(parsed.person2Color))
+      parsed.person2Color = fallback.person2Color;
+    return parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+export interface OutfitScoreResult {
+  score: number;
+  colorScore: number;
+  fitScore: number;
+  styleScore: number;
+  analysis: string;
+  suggestion: string;
+}
+
+/**
+ * Analyze outfit photo with Gemini and return detailed score.
+ */
+export async function analyzeOutfitScore(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<OutfitScoreResult> {
+  const fallback: OutfitScoreResult = {
+    score: 72,
+    colorScore: 28,
+    fitScore: 22,
+    styleScore: 22,
+    analysis: "Solid base look with room to elevate.",
+    suggestion: "Try adding a statement accessory to lift the overall style.",
+  };
+  try {
+    const prompt =
+      'You are a fashion expert. Analyze this outfit photo. Score it out of 100 based on: Color Harmony (40%), Fit & Silhouette (30%), Style & Trend (30% - use 2026 trends). Return ONLY valid JSON: {"score": number, "colorScore": number, "fitScore": number, "styleScore": number, "analysis": "one sentence why this score", "suggestion": "one specific actionable improvement tip"}';
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 300 },
+      }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const json = extractJson(raw);
+    const parsed = JSON.parse(json) as OutfitScoreResult;
+    // Validate
+    if (
+      typeof parsed.score !== "number" ||
+      parsed.score < 0 ||
+      parsed.score > 100
+    )
+      return fallback;
+    return parsed;
+  } catch {
+    return fallback;
   }
 }

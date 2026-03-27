@@ -340,10 +340,12 @@ function buildRetailerUrl(
   retailer: string,
   garmentKeyword: string,
   colorName: string,
+  moodKeyword?: string,
 ): string {
+  const moodSuffix = moodKeyword ? ` ${moodKeyword}` : "";
   const g = encodeURIComponent(garmentKeyword);
   const cn = encodeURIComponent(colorName);
-  const q = encodeURIComponent(`${garmentKeyword} ${colorName}`);
+  const q = encodeURIComponent(`${garmentKeyword} ${colorName}${moodSuffix}`);
   switch (retailer) {
     case "amazon":
       return `https://www.amazon.in/s?k=${g}+${cn}`;
@@ -801,6 +803,9 @@ interface ShopMatchingStylesProps {
   colorName: string;
   userGender: string;
   selectedMatchingColor: { hex: string; name: string } | null;
+  allowedGarments?: string[];
+  sizeHint?: string;
+  moodKeyword?: string;
 }
 
 function ShopMatchingStyles({
@@ -809,6 +814,9 @@ function ShopMatchingStyles({
   colorName,
   userGender,
   selectedMatchingColor,
+  allowedGarments,
+  sizeHint,
+  moodKeyword,
 }: ShopMatchingStylesProps) {
   const [layoutMode, setLayoutMode] = useState<"accordion" | "tabs">("tabs");
   const [activeRetailerTab, setActiveRetailerTab] = useState(0);
@@ -825,7 +833,8 @@ function ShopMatchingStyles({
       garment: GARMENT_TYPES.find((g) => g.label === label),
       products: getProductsForGarment(label, userGender),
     }))
-    .filter((s) => s.garment && s.products.length > 0);
+    .filter((s) => s.garment && s.products.length > 0)
+    .filter((s) => !allowedGarments || allowedGarments.includes(s.label));
 
   const allRetailers = RETAILERS;
 
@@ -1055,6 +1064,7 @@ function ShopMatchingStyles({
                                   retailer.key,
                                   keyword,
                                   shopColor.name,
+                                  moodKeyword,
                                 )}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -1063,6 +1073,11 @@ function ShopMatchingStyles({
                               >
                                 Shop on {retailer.badge}
                               </a>
+                              {sizeHint && (
+                                <span className="block text-center text-[9px] text-muted-foreground mt-1">
+                                  Size: {sizeHint}
+                                </span>
+                              )}
                             </div>
                           </motion.div>
                         ))}
@@ -1458,6 +1473,82 @@ function getColorPsychology(hex: string): string {
   return "Pink brings warmth and playfulness — it softens a look beautifully and radiates approachable confidence.";
 }
 
+// ── Age profile helper ───────────────────────────────────────────────────
+type AgeCategory = "kid" | "teenage" | "young" | "adult" | "senior";
+
+function getAgeProfile(age: AgeCategory) {
+  switch (age) {
+    case "kid":
+      return {
+        allowedGarments: [
+          "Top / Shirt",
+          "Bottom / Pants",
+          "Shoes / Footwear",
+          "Bag / Purse",
+        ],
+        sizeHint: "XS/S",
+        excludeCategories: ["formal", "ethnic-adult", "saree"],
+      };
+    case "teenage":
+      return {
+        allowedGarments: [
+          "Top / Shirt",
+          "Bottom / Pants",
+          "Jacket / Coat",
+          "Shoes / Footwear",
+          "Watch / Accessory",
+          "Bag / Purse",
+        ],
+        sizeHint: "S/M",
+        excludeCategories: ["saree", "ethnic-adult"],
+      };
+    case "young":
+      return {
+        allowedGarments: GARMENT_TYPES.map((g) => g.label),
+        sizeHint: "M/L",
+        excludeCategories: [],
+      };
+    case "adult":
+      return {
+        allowedGarments: GARMENT_TYPES.map((g) => g.label),
+        sizeHint: "M/L/XL",
+        excludeCategories: [],
+      };
+    case "senior":
+      return {
+        allowedGarments: [
+          "Top / Shirt",
+          "Bottom / Pants",
+          "Kurta / Kurti",
+          "Saree / Ethnic Wear",
+          "Shoes / Footwear",
+        ],
+        sizeHint: "L/XL/XXL",
+        excludeCategories: ["streetwear", "crop", "mini"],
+      };
+  }
+}
+
+function getMoodKeyword(mood: string, occasion: string): string {
+  const moodMap: Record<string, string> = {
+    formal: "formal",
+    party: "party wear",
+    "date night": "date night",
+    festive: "festive",
+    casual: "",
+  };
+  const occasionMap: Record<string, string> = {
+    office: "office wear",
+    wedding: "wedding",
+    outdoor: "outdoor casual",
+    travel: "travel",
+  };
+  const parts = [moodMap[mood] ?? "", occasionMap[occasion] ?? ""].filter(
+    Boolean,
+  );
+  return parts.join(" ");
+}
+
 export default function ScannerPage() {
   const [lockedColor, setLockedColor] = useState<string | null>(null);
   const [detectedColor, setDetectedColor] = useState<string>("#808080");
@@ -1473,6 +1564,14 @@ export default function ScannerPage() {
     name: string;
   } | null>(null);
   const [colorHistory, setColorHistory] = useState<string[]>([]);
+  const [selectedGender, setSelectedGender] = useState<"male" | "female">(
+    "male",
+  );
+  const [selectedAge, setSelectedAge] = useState<
+    "kid" | "teenage" | "young" | "adult" | "senior"
+  >("young");
+  const [selectedMood, setSelectedMood] = useState<string>("casual");
+  const [selectedOccasion, setSelectedOccasion] = useState<string>("");
 
   const detectedColorRef = useRef<string>("#808080");
   const samplingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1480,6 +1579,22 @@ export default function ScannerPage() {
 
   const { userProfile } = useUserProfile();
   const userGender = userProfile?.gender ?? "all";
+  const ageProfile = getAgeProfile(selectedAge);
+  const moodKeyword = getMoodKeyword(selectedMood, selectedOccasion);
+
+  // Auto-fill gender/age from profile
+  useEffect(() => {
+    if (userProfile?.gender === "men") setSelectedGender("male");
+    else if (userProfile?.gender === "women") setSelectedGender("female");
+    if (userProfile?.age) {
+      const age = Number(userProfile.age);
+      if (age < 13) setSelectedAge("kid");
+      else if (age < 18) setSelectedAge("teenage");
+      else if (age < 30) setSelectedAge("young");
+      else if (age < 60) setSelectedAge("adult");
+      else setSelectedAge("senior");
+    }
+  }, [userProfile?.gender, userProfile?.age]);
 
   const {
     videoRef,
@@ -1649,6 +1764,192 @@ export default function ScannerPage() {
       <AnimatePresence>
         <ColorOfDayBanner />
       </AnimatePresence>
+
+      {/* ── Gender + Age + Mood + Occasion Filter Bar ── */}
+      <motion.div
+        className="ios-card overflow-hidden"
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+        data-ocid="scanner.panel"
+      >
+        <div className="px-4 pt-3 pb-2 space-y-2.5">
+          {/* Gender toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Gender
+            </span>
+            <div className="flex gap-1.5">
+              {(["male", "female"] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setSelectedGender(g)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    selectedGender === g
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                  data-ocid="scanner.toggle"
+                >
+                  {g === "male" ? "👔 Male" : "👗 Female"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Age chips */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Age
+            </span>
+            <div
+              className="flex gap-1.5 overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {(["kid", "teenage", "young", "adult", "senior"] as const).map(
+                (a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setSelectedAge(a)}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
+                      selectedAge === a
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                    data-ocid="scanner.toggle"
+                  >
+                    {a}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+
+          {/* Mood chips */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Mood
+            </span>
+            <div
+              className="flex gap-1.5 overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {["casual", "formal", "party", "date night", "festive"].map(
+                (m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() =>
+                      setSelectedMood(selectedMood === m ? "casual" : m)
+                    }
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
+                      selectedMood === m
+                        ? "bg-accent text-accent-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                    data-ocid="scanner.toggle"
+                  >
+                    {m}
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+
+          {/* Occasion chips */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Occasion
+            </span>
+            <div
+              className="flex gap-1.5 overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {["office", "wedding", "outdoor", "travel"].map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() =>
+                    setSelectedOccasion(selectedOccasion === o ? "" : o)
+                  }
+                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all capitalize ${
+                    selectedOccasion === o
+                      ? "bg-accent text-accent-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                  data-ocid="scanner.toggle"
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick presets */}
+          <div className="flex items-center gap-2 pb-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Preset
+            </span>
+            <div
+              className="flex gap-1.5 overflow-x-auto"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {[
+                {
+                  label: "🎒 School",
+                  age: "teenage" as const,
+                  mood: "casual",
+                  occasion: "outdoor",
+                },
+                {
+                  label: "🎉 Festival",
+                  age: "adult" as const,
+                  mood: "festive",
+                  occasion: "wedding",
+                },
+                {
+                  label: "💪 Gym",
+                  age: "young" as const,
+                  mood: "casual",
+                  occasion: "outdoor",
+                },
+                {
+                  label: "💞 Date",
+                  age: "young" as const,
+                  mood: "date night",
+                  occasion: "outdoor",
+                },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAge(preset.age);
+                    setSelectedMood(preset.mood);
+                    setSelectedOccasion(preset.occasion);
+                  }}
+                  className="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-all border border-primary/20"
+                  data-ocid="scanner.button"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Size hint badge */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-14 flex-shrink-0">
+              Size
+            </span>
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-muted text-muted-foreground border border-border/60">
+              {ageProfile.sizeHint}
+            </span>
+          </div>
+        </div>
+      </motion.div>
 
       {/* ── Camera Card ── */}
       <motion.div
@@ -1908,7 +2209,24 @@ export default function ScannerPage() {
             <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
             <div className="p-3">
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {GARMENT_TYPES.map((gt) => {
+                {GARMENT_TYPES.filter((gt) => {
+                  // Filter by gender
+                  if (selectedGender === "male") {
+                    const maleExclude = [
+                      "Dress",
+                      "Saree / Ethnic Wear",
+                      "Bag / Purse",
+                      "Scarf / Dupatta",
+                    ];
+                    if (maleExclude.includes(gt.label)) return false;
+                  }
+                  // Filter by age
+                  const ap = getAgeProfile(selectedAge);
+                  if (ap.allowedGarments.length < GARMENT_TYPES.length) {
+                    return ap.allowedGarments.includes(gt.label);
+                  }
+                  return true;
+                }).map((gt) => {
                   const isActiveGt = selectedGarment?.label === gt.label;
                   return (
                     <button
@@ -2335,6 +2653,9 @@ export default function ScannerPage() {
               colorName={colorName}
               userGender={userGender}
               selectedMatchingColor={selectedMatchingColor}
+              allowedGarments={ageProfile.allowedGarments}
+              sizeHint={ageProfile.sizeHint}
+              moodKeyword={moodKeyword}
             />
           </motion.div>
         )}

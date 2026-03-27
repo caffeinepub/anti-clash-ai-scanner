@@ -32,6 +32,50 @@ export function hexToHsl(hex: string): [number, number, number] {
 }
 
 /**
+ * Convert HSL to hex
+ */
+export function hslToHex(hue: number, sat: number, lit: number): string {
+  const h2 = ((hue % 360) + 360) % 360;
+  const s2 = Math.max(0, Math.min(1, sat));
+  const l2 = Math.max(0, Math.min(1, lit));
+  const c = (1 - Math.abs(2 * l2 - 1)) * s2;
+  const x = c * (1 - Math.abs(((h2 / 60) % 2) - 1));
+  const m = l2 - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h2 < 60) {
+    r = c;
+    g = x;
+  } else if (h2 < 120) {
+    r = x;
+    g = c;
+  } else if (h2 < 180) {
+    g = c;
+    b = x;
+  } else if (h2 < 240) {
+    g = x;
+    b = c;
+  } else if (h2 < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  const rr = Math.round((r + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const gg = Math.round((g + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const bb = Math.round((b + m) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `#${rr}${gg}${bb}`.toUpperCase();
+}
+
+/**
  * Map a hex color to a human-readable color name
  */
 export function hexToColorName(hex: string): string {
@@ -129,47 +173,6 @@ export function generateMatchingColors(
 ): { hex: string; name: string }[] {
   const [h, s, l] = hexToHsl(hex);
 
-  const hslToHex = (hue: number, sat: number, lit: number): string => {
-    const h2 = ((hue % 360) + 360) % 360;
-    const s2 = Math.max(0, Math.min(1, sat));
-    const l2 = Math.max(0, Math.min(1, lit));
-    const c = (1 - Math.abs(2 * l2 - 1)) * s2;
-    const x = c * (1 - Math.abs(((h2 / 60) % 2) - 1));
-    const m = l2 - c / 2;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (h2 < 60) {
-      r = c;
-      g = x;
-    } else if (h2 < 120) {
-      r = x;
-      g = c;
-    } else if (h2 < 180) {
-      g = c;
-      b = x;
-    } else if (h2 < 240) {
-      g = x;
-      b = c;
-    } else if (h2 < 300) {
-      r = x;
-      b = c;
-    } else {
-      r = c;
-      b = x;
-    }
-    const rr = Math.round((r + m) * 255)
-      .toString(16)
-      .padStart(2, "0");
-    const gg = Math.round((g + m) * 255)
-      .toString(16)
-      .padStart(2, "0");
-    const bb = Math.round((b + m) * 255)
-      .toString(16)
-      .padStart(2, "0");
-    return `#${rr}${gg}${bb}`.toUpperCase();
-  };
-
   // For very dark colors (black, dark grey, dark navy) return light/neutral palette
   if (l < 0.2) {
     const candidates = [
@@ -252,4 +255,346 @@ export function generateMatchingColors(
     const hexVal = hslToHex(hue, sat, lit);
     return { hex: hexVal, name: hexToColorName(hexVal) };
   });
+}
+
+/**
+ * Internal color theory: get category-based color matches instantly (no AI needed)
+ */
+export interface CategoryMatch {
+  hex: string;
+  label: string;
+  harmony: string;
+}
+
+export function getCategoryMatches(
+  baseHex: string,
+  garmentType: string,
+): CategoryMatch[] {
+  const [h, s, l] = hexToHsl(baseHex);
+  const isVeryDark = l < 0.2;
+  const isLight = l > 0.75;
+  const isNeutral = s < 0.18;
+
+  // Helper to create a CategoryMatch
+  const make = (hex: string, harmony: string): CategoryMatch => ({
+    hex,
+    label: hexToColorName(hex),
+    harmony,
+  });
+
+  // For bottoms (pants, jeans, etc): suggest tops/shirts that pair well
+  if (garmentType === "bottom" || garmentType === "pants") {
+    if (isVeryDark) {
+      return [
+        make("#FFFFFF", "Neutral Balance"),
+        make("#F5F0E8", "Neutral Balance"),
+        make("#E8E0D4", "Neutral Balance"),
+        make(hslToHex(h, 0.55, 0.65), "Monochromatic"),
+        make("#8B2635", "Complementary"),
+        make("#2D5A27", "Triadic"),
+        make("#1B3A6B", "Analogous"),
+        make("#D4A853", "Split Complementary"),
+      ];
+    }
+    if (isLight || isNeutral) {
+      return [
+        make(hslToHex(h + 180, Math.min(s + 0.2, 0.9), 0.4), "Complementary"),
+        make("#1A1A2E", "High Contrast"),
+        make("#2C3E50", "High Contrast"),
+        make(hslToHex(h + 120, 0.65, 0.4), "Triadic"),
+        make(hslToHex(h - 30, s * 0.8, 0.45), "Analogous"),
+        make("#8B6914", "Earthy"),
+        make("#8B2635", "Bold Contrast"),
+        make(hslToHex(h + 30, s * 0.7, 0.55), "Analogous"),
+      ];
+    }
+    return [
+      make("#F5F5F5", "Neutral Balance"),
+      make("#1A1A1A", "High Contrast"),
+      make(hslToHex(h + 180, s, l), "Complementary"),
+      make("#D4D4D4", "Neutral Balance"),
+      make(hslToHex(h + 150, s * 0.8, l * 0.9), "Split Complementary"),
+      make("#F0EBE3", "Soft Neutral"),
+      make(hslToHex(h + 120, s * 0.7, 0.55), "Triadic"),
+      make("#C4A882", "Earthy Neutral"),
+    ];
+  }
+
+  // For tops/shirts: suggest bottoms, shoes, accessories
+  if (garmentType === "top" || garmentType === "shirt") {
+    if (isVeryDark || isNeutral) {
+      return [
+        make("#F5F0E8", "Neutral Pair"),
+        make("#E8D5C0", "Earthy Neutral"),
+        make("#2C3E50", "Tonal"),
+        make("#8B6914", "Warm Earthy"),
+        make("#1B3A6B", "Deep Tonal"),
+        make(hslToHex(h + 30, 0.55, 0.45), "Analogous"),
+        make("#4A4A4A", "Monochromatic"),
+        make("#C4A882", "Warm Contrast"),
+      ];
+    }
+    return [
+      make("#1A1A1A", "High Contrast"),
+      make("#2C3E50", "Dark Neutral"),
+      make("#4A4A4A", "Mid Neutral"),
+      make(hslToHex(h + 180, s * 0.8, 0.3), "Complementary"),
+      make("#F5F0E8", "Light Neutral"),
+      make("#8B6914", "Earthy"),
+      make(hslToHex(h + 150, s * 0.6, 0.35), "Split Complementary"),
+      make("#C4A882", "Warm Neutral"),
+    ];
+  }
+
+  // For shoes
+  if (garmentType === "shoes" || garmentType === "footwear") {
+    if (isVeryDark || isNeutral) {
+      return [
+        make("#FFFFFF", "Classic Contrast"),
+        make("#F5F0E8", "Warm Neutral"),
+        make(hslToHex(h + 180, 0.6, 0.5), "Complementary Pop"),
+        make("#8B6914", "Earthy Warm"),
+        make("#1B3A6B", "Navy Pair"),
+        make("#D4A853", "Gold Accent"),
+        make("#8B2635", "Burgundy Classic"),
+        make(hslToHex(h + 120, 0.5, 0.5), "Triadic"),
+      ];
+    }
+    return [
+      make("#1A1A1A", "Black Classic"),
+      make("#8B7355", "Brown Classic"),
+      make("#FFFFFF", "White Fresh"),
+      make(hslToHex(h + 180, s * 0.7, 0.4), "Complementary"),
+      make("#D4D4D4", "Silver"),
+      make(hslToHex(h + 150, s * 0.6, 0.45), "Split Complementary"),
+      make("#C4A882", "Nude Tone"),
+      make("#2C3E50", "Dark Pair"),
+    ];
+  }
+
+  // For accessories (watches, jewelry, scarves)
+  if (garmentType === "accessories" || garmentType === "watch") {
+    return [
+      make("#D4A853", "Gold Classic"),
+      make("#C0C0C0", "Silver Modern"),
+      make("#8B6914", "Bronze Warm"),
+      make(hslToHex(h + 180, s * 0.8, 0.5), "Complementary Accent"),
+      make("#1A1A1A", "Sleek Black"),
+      make("#8B2635", "Burgundy Rich"),
+      make(hslToHex(h + 120, s * 0.6, 0.5), "Triadic Pop"),
+      make(hslToHex(h + 30, s * 0.7, 0.6), "Warm Analogous"),
+    ];
+  }
+
+  // For ethnic wear (saree, kurta)
+  if (
+    garmentType === "ethnic" ||
+    garmentType === "saree" ||
+    garmentType === "kurta"
+  ) {
+    return [
+      make("#D4A853", "Gold Classic"),
+      make("#8B2635", "Maroon Royal"),
+      make(hslToHex(h + 180, s, l), "Complementary"),
+      make("#1A3A2E", "Deep Green"),
+      make("#F5F0E8", "Ivory Neutral"),
+      make(hslToHex(h + 120, s * 0.8, l * 0.9), "Triadic"),
+      make("#8B6914", "Earthy"),
+      make(hslToHex(h - 30, s * 0.9, Math.min(l + 0.1, 0.8)), "Analogous"),
+    ];
+  }
+
+  // For bags/purses
+  if (garmentType === "bag") {
+    return [
+      make("#1A1A1A", "Black Classic"),
+      make("#8B7355", "Brown Tan"),
+      make("#FFFFFF", "White Clean"),
+      make("#D4A853", "Gold Tan"),
+      make(hslToHex(h + 180, s * 0.7, 0.4), "Complementary"),
+      make("#8B2635", "Burgundy"),
+      make("#C4A882", "Nude Beige"),
+      make(hslToHex(h + 150, s * 0.6, 0.45), "Split Complementary"),
+    ];
+  }
+
+  // For jackets/blazers
+  if (garmentType === "jacket") {
+    if (isVeryDark || isNeutral) {
+      return [
+        make("#FFFFFF", "Classic White"),
+        make("#F5F0E8", "Ivory"),
+        make("#1B3A6B", "Navy Tonal"),
+        make("#8B2635", "Burgundy Pop"),
+        make("#8B6914", "Earthy Warm"),
+        make(hslToHex(h + 120, 0.5, 0.5), "Triadic"),
+        make("#D4D4D4", "Light Gray"),
+        make("#2D5A27", "Forest Pop"),
+      ];
+    }
+    return [
+      make("#1A1A1A", "Black Sleek"),
+      make("#F5F0E8", "Light Neutral"),
+      make(hslToHex(h + 180, s * 0.7, 0.35), "Complementary"),
+      make("#2C3E50", "Dark Neutral"),
+      make(hslToHex(h + 30, s * 0.6, 0.55), "Analogous"),
+      make("#8B6914", "Earthy"),
+      make(hslToHex(h + 150, s * 0.8, 0.4), "Split Complementary"),
+      make("#C4A882", "Warm Neutral"),
+    ];
+  }
+
+  // Default fallback - use complementary + neutrals
+  const comp = hslToHex(h + 180, s, l);
+  const tri1 = hslToHex(h + 120, s * 0.8, l);
+  const tri2 = hslToHex(h + 240, s * 0.8, l);
+  return [
+    make(comp, "Complementary"),
+    make("#F5F5F5", "Light Neutral"),
+    make("#1A1A1A", "Dark Neutral"),
+    make(tri1, "Triadic"),
+    make(tri2, "Triadic"),
+    make(hslToHex(h + 30, s * 0.7, Math.min(l + 0.15, 0.85)), "Analogous"),
+    make("#D4A853", "Warm Accent"),
+    make(hslToHex(h + 150, s * 0.6, 0.5), "Split Complementary"),
+  ];
+}
+
+/**
+ * Get a 0-100 harmony score between two hex colors
+ */
+export function getColorHarmonyScore(hex1: string, hex2: string): number {
+  const [h1, s1, l1] = hexToHsl(hex1);
+  const [h2, s2, l2] = hexToHsl(hex2);
+  const hueDiff = Math.abs((h1 - h2 + 360) % 360);
+  const normalizedHueDiff = Math.min(hueDiff, 360 - hueDiff);
+
+  // High contrast light/dark is always good
+  const lightnessDiff = Math.abs(l1 - l2);
+  if (lightnessDiff > 0.55) return 88;
+
+  // Complementary (around 180 degrees)
+  if (normalizedHueDiff > 150 && normalizedHueDiff < 210) return 90;
+  // Triadic (around 120 degrees)
+  if (normalizedHueDiff > 100 && normalizedHueDiff <= 150) return 80;
+  // Analogous (close hues)
+  if (normalizedHueDiff < 40) return s1 < 0.15 || s2 < 0.15 ? 85 : 70;
+  // If one is neutral
+  if (s1 < 0.18 || s2 < 0.18) return 85;
+  // Clashing
+  if (normalizedHueDiff > 60 && normalizedHueDiff < 100 && s1 > 0.5 && s2 > 0.5)
+    return 35;
+  return 65;
+}
+
+export interface CoupleHarmonyResult {
+  score: number;
+  tier:
+    | "monochromatic"
+    | "complementary"
+    | "neutrals_pop"
+    | "analogous"
+    | "clash";
+  advice: string;
+  fixItSuggestion: string | null;
+}
+
+const TREND_COLORS_2026 = [
+  { name: "Transformative Teal", hex: "#2D9B9B" },
+  { name: "Cloud Dancer", hex: "#F5F0E8" },
+  { name: "Lava Falls", hex: "#D4453A" },
+  { name: "Mocha Brown", hex: "#6F4E37" },
+  { name: "Sage Green", hex: "#7D9B76" },
+  { name: "Dusty Pink", hex: "#D4A5A5" },
+  { name: "Powder Blue", hex: "#A8C5D4" },
+  { name: "Earthy Terracotta", hex: "#C87941" },
+  { name: "Midnight Navy", hex: "#1B2A4A" },
+  { name: "Vanilla Cream", hex: "#F5ECD7" },
+];
+
+/**
+ * Get couple harmony score with tier and advice
+ */
+export function getCoupleHarmonyScore(
+  hex1: string,
+  hex2: string,
+): CoupleHarmonyResult {
+  const [h1, s1, l1] = hexToHsl(hex1);
+  const [h2, s2, l2] = hexToHsl(hex2);
+  const hueDiff = Math.abs((h1 - h2 + 360) % 360);
+  const normalizedHueDiff = Math.min(hueDiff, 360 - hueDiff);
+  const lightnessDiff = Math.abs(l1 - l2);
+
+  const isNeutral1 = s1 < 0.2;
+  const isNeutral2 = s2 < 0.2;
+  const isVivid1 = s1 > 0.5;
+  const isVivid2 = s2 > 0.5;
+
+  let tier: CoupleHarmonyResult["tier"];
+  let score: number;
+  let advice: string;
+
+  // Neutrals + Pop
+  if ((isNeutral1 && isVivid2) || (isNeutral2 && isVivid1)) {
+    tier = "neutrals_pop";
+    score = 88;
+    advice =
+      "Clean and classic. That pop of color ties you both together beautifully.";
+  }
+  // Monochromatic (same hue family, different lightness)
+  else if (normalizedHueDiff < 30 && lightnessDiff > 0.2) {
+    tier = "monochromatic";
+    score = 95;
+    advice = "Perfect tonal transition! You look sophisticated and unified.";
+  }
+  // Complementary (opposite colors)
+  else if (normalizedHueDiff >= 150 && normalizedHueDiff <= 210) {
+    tier = "complementary";
+    score = 90;
+    advice = "Great contrast! These colors are balanced and photo-ready.";
+  }
+  // Analogous (close hues)
+  else if (normalizedHueDiff >= 30 && normalizedHueDiff < 60) {
+    tier = "analogous";
+    score = 82;
+    advice = "Harmonious and natural — a calm, coordinated look.";
+  }
+  // High Clash
+  else if (
+    normalizedHueDiff >= 60 &&
+    normalizedHueDiff < 150 &&
+    isVivid1 &&
+    isVivid2
+  ) {
+    tier = "clash";
+    score = 35;
+    advice =
+      "You're fighting for the spotlight! One of you should switch to a neutral to let the other's color shine.";
+  }
+  // Default medium
+  else {
+    tier = "analogous";
+    score = 72;
+    advice =
+      "Decent coordination — a subtle tonal adjustment would elevate this look.";
+  }
+
+  let fixItSuggestion: string | null = null;
+  if (score < 70) {
+    // Suggest a 2026 trend color for Person 2 that would complement Person 1
+    const name1 = hexToColorName(hex1);
+    // Find a color from 2026 trends that has a high harmony score with hex1
+    let bestTrend = TREND_COLORS_2026[1]; // Cloud Dancer as safe default
+    let bestScore = 0;
+    for (const trend of TREND_COLORS_2026) {
+      const s = getColorHarmonyScore(hex1, trend.hex);
+      if (s > bestScore) {
+        bestScore = s;
+        bestTrend = trend;
+      }
+    }
+    fixItSuggestion = `Partner 2 should try ${bestTrend.name} (${bestTrend.hex}) to balance Partner 1's ${name1} outfit.`;
+  }
+
+  return { score, tier, advice, fixItSuggestion };
 }

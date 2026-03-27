@@ -17,9 +17,10 @@ import {
   UserCircle,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ColourClashLogo from "./components/ColourClashLogo";
 import GreetingOverlay from "./components/GreetingOverlay";
+import NetflixIntro from "./components/NetflixIntro";
 import {
   UserProfileProvider,
   useUserProfile,
@@ -82,14 +83,11 @@ function LoginWelcomeModal({
           transition={{ duration: 0.22 }}
           data-ocid="auth.modal"
         >
-          {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-black/55 backdrop-blur-md"
             onClick={onClose}
             aria-hidden="true"
           />
-
-          {/* Card */}
           <motion.div
             className="relative z-10 w-full max-w-sm bg-card rounded-3xl shadow-2xl overflow-hidden"
             initial={{ scale: 0.88, opacity: 0, y: 30 }}
@@ -97,7 +95,6 @@ function LoginWelcomeModal({
             exit={{ scale: 0.88, opacity: 0, y: 20 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
           >
-            {/* Rainbow accent band */}
             <div
               className="h-1.5 w-full"
               style={{
@@ -105,9 +102,7 @@ function LoginWelcomeModal({
                   "linear-gradient(90deg, #FF6B6B, #FBBF24, #34D399, #60A5FA, #818CF8, #F472B6)",
               }}
             />
-
             <div className="flex flex-col items-center gap-5 px-7 py-8">
-              {/* Colorful circles decoration */}
               <div className="relative flex items-center justify-center w-20 h-20 mb-1">
                 <div
                   className="absolute w-14 h-14 rounded-full opacity-80"
@@ -121,16 +116,12 @@ function LoginWelcomeModal({
                   <Sparkles className="w-6 h-6 text-primary" />
                 </div>
               </div>
-
-              {/* Logo + tagline */}
               <div className="flex flex-col items-center gap-1">
                 <ColourClashLogo size="lg" />
                 <span className="text-[11px] italic text-muted-foreground tracking-wide font-medium">
                   just fly with it...
                 </span>
               </div>
-
-              {/* Message */}
               <div className="text-center space-y-2">
                 <h2 className="font-display font-bold text-xl text-foreground leading-tight">
                   To immerse in the Colour Clash world, we need your presence
@@ -140,8 +131,6 @@ function LoginWelcomeModal({
                   colour scanning &amp; your style profile.
                 </p>
               </div>
-
-              {/* Sign In button */}
               <button
                 type="button"
                 onClick={() => {
@@ -158,8 +147,6 @@ function LoginWelcomeModal({
               >
                 ✨ Sign In / Sign Up
               </button>
-
-              {/* Maybe later */}
               <button
                 type="button"
                 onClick={onClose}
@@ -310,7 +297,6 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
         className="w-56 p-0 overflow-hidden border-border/60 shadow-2xl"
         data-ocid="auth.popover"
       >
-        {/* User info header */}
         <div className="flex items-center gap-3 p-4 bg-muted/30">
           <div className="relative shrink-0">
             <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center overflow-hidden">
@@ -359,7 +345,20 @@ function UserArea({ onProfileClick }: { onProfileClick: () => void }) {
 }
 
 function AppContent() {
+  const [showIntro, setShowIntro] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("scanner");
+  const [homeKey, setHomeKey] = useState(0);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const handleIntroComplete = useCallback(() => {
+    setShowIntro(false);
+  }, []);
+
+  const resetApp = useCallback(() => {
+    setActiveTab("scanner");
+    setHomeKey((k) => k + 1);
+    setShowProfile(false);
+  }, []);
 
   const pageTitles: Record<Tab, { subtitle: string }> = {
     scanner: { subtitle: "Color Scanner" },
@@ -376,6 +375,10 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Netflix-style intro -- always shows on app open */}
+      {showIntro && <NetflixIntro onComplete={handleIntroComplete} />}
+
+      {/* Greeting overlay -- shown immediately even during intro */}
       <GreetingOverlay />
 
       {/* iOS-style Header */}
@@ -384,7 +387,14 @@ function AppContent() {
         style={{ borderBottom: "0.5px solid oklch(var(--border))" }}
       >
         <div className="max-w-lg mx-auto px-5 pt-4 pb-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+          {/* Logo -- click to hard reset */}
+          <button
+            type="button"
+            onClick={resetApp}
+            className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center transition-all active:scale-90 hover:bg-primary/30"
+            aria-label="Go to home"
+            data-ocid="nav.home.button"
+          >
             <svg
               width="22"
               height="22"
@@ -400,7 +410,7 @@ function AppContent() {
               <circle cx="18" cy="18" r="4" fill="#FBBF24" />
               <circle cx="14" cy="14" r="3" fill="oklch(0.97 0.005 250)" />
             </svg>
-          </div>
+          </button>
           <div className="flex-1 min-w-0">
             <AnimatePresence mode="wait">
               <motion.div
@@ -410,12 +420,17 @@ function AppContent() {
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ duration: 0.18 }}
               >
-                <div className="flex flex-col items-start leading-none gap-0.5">
+                <button
+                  type="button"
+                  onClick={resetApp}
+                  className="flex flex-col items-start leading-none gap-0.5 text-left"
+                  aria-label="Colour Clash - go home"
+                >
                   <ColourClashLogo size="md" />
                   <span className="text-[9px] italic text-muted-foreground tracking-wide font-medium">
                     just fly with it...
                   </span>
-                </div>
+                </button>
                 <p className="text-xs text-muted-foreground">
                   {current.subtitle}
                 </p>
@@ -423,7 +438,7 @@ function AppContent() {
             </AnimatePresence>
           </div>
           <div className="ml-auto">
-            <UserArea onProfileClick={() => setActiveTab("profile")} />
+            <UserArea onProfileClick={() => setShowProfile(true)} />
           </div>
         </div>
       </header>
@@ -438,12 +453,11 @@ function AppContent() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ type: "spring", stiffness: 400, damping: 38 }}
           >
-            {activeTab === "scanner" && <ScannerPage />}
+            {activeTab === "scanner" && <ScannerPage key={homeKey} />}
             {activeTab === "favorites" && (
               <FavoritesPage onNavigate={(tab) => setActiveTab(tab as Tab)} />
             )}
             {activeTab === "style" && <StyleGuidePage />}
-            {activeTab === "profile" && <ProfilePage />}
             {activeTab === "score" && (
               <OutfitScorePage
                 onNavigateToSkinTone={() => setActiveTab("skintone")}
@@ -507,7 +521,6 @@ function AppContent() {
             );
           })}
         </div>
-        {/* Footer */}
         <div
           className="text-center py-1.5"
           style={{ borderTop: "0.5px solid oklch(var(--border) / 0.5)" }}
@@ -525,6 +538,54 @@ function AppContent() {
           </p>
         </div>
       </nav>
+
+      {/* Full-page Profile Slide-in */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 60,
+          transform: showProfile ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          background: "oklch(var(--background))",
+          overflowY: "auto",
+        }}
+        aria-hidden={!showProfile}
+      >
+        {/* Back button */}
+        <div
+          className="sticky top-0 z-10 ios-glass"
+          style={{ borderBottom: "0.5px solid oklch(var(--border))" }}
+        >
+          <div className="max-w-lg mx-auto px-5 pt-4 pb-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowProfile(false)}
+              className="flex items-center gap-2 text-sm font-semibold text-primary hover:opacity-80 transition-opacity"
+              data-ocid="profile.close_button"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+            <h1 className="text-base font-bold text-foreground">Profile</h1>
+          </div>
+        </div>
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-24">
+          {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
+        </div>
+      </div>
     </div>
   );
 }
