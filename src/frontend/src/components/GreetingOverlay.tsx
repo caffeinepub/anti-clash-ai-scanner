@@ -1,7 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { useUserProfile } from "../context/UserProfileContext";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -11,39 +9,46 @@ function getGreeting(): string {
 }
 
 export default function GreetingOverlay() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true); // show immediately on mount
   const hasShownRef = useRef(false);
   const [isBirthday, setIsBirthday] = useState(false);
   const [turningAge, setTurningAge] = useState(0);
-  const { userProfile } = useUserProfile();
-  const { identity } = useInternetIdentity();
 
-  const isLoggedIn = identity && !identity.getPrincipal().isAnonymous();
-  const firstName = userProfile?.displayName?.split(" ")[0] ?? "";
-
-  useEffect(() => {
-    const dob = localStorage.getItem("colourclash_dob");
-    if (dob) {
-      const dobDate = new Date(dob);
-      const today = new Date();
-      if (
-        dobDate.getMonth() === today.getMonth() &&
-        dobDate.getDate() === today.getDate()
-      ) {
-        setIsBirthday(true);
-        const age = today.getFullYear() - dobDate.getFullYear();
-        setTurningAge(age);
-      }
+  // Read name and DOB straight from localStorage — no backend wait
+  const firstName = (() => {
+    try {
+      const name = localStorage.getItem("colourclash_displayName") || "";
+      return name.split(" ")[0] || "";
+    } catch {
+      return "";
     }
-  }, []);
+  })();
 
   useEffect(() => {
-    if (!isLoggedIn || !firstName || hasShownRef.current) return;
+    // Birthday check
+    try {
+      const dob = localStorage.getItem("colourclash_dob");
+      if (dob) {
+        const dobDate = new Date(dob);
+        const today = new Date();
+        if (
+          dobDate.getMonth() === today.getMonth() &&
+          dobDate.getDate() === today.getDate()
+        ) {
+          setIsBirthday(true);
+          setTurningAge(today.getFullYear() - dobDate.getFullYear());
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Show for 2.5 seconds then dismiss
+    if (hasShownRef.current) return;
     hasShownRef.current = true;
-    setVisible(true);
     const timer = setTimeout(() => setVisible(false), 2500);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, firstName]);
+  }, []);
 
   return (
     <AnimatePresence>
@@ -55,7 +60,7 @@ export default function GreetingOverlay() {
               ? { background: "oklch(0.28 0.18 320)" }
               : { background: "oklch(0.28 0.18 255)" }
           }
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4 }}
@@ -65,7 +70,7 @@ export default function GreetingOverlay() {
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
-            transition={{ delay: 0.15, duration: 0.5 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
           >
             {isBirthday ? (
               <>
@@ -76,7 +81,7 @@ export default function GreetingOverlay() {
                   🎂 Happy Birthday,
                 </p>
                 <h1 className="font-display font-bold text-white text-5xl tracking-tight">
-                  {firstName}!
+                  {firstName || "You"}!
                 </h1>
                 <p className="font-display text-white/80 text-lg mt-3">
                   You&apos;re turning {turningAge} today
@@ -88,11 +93,19 @@ export default function GreetingOverlay() {
                   className="font-display text-white/70 text-xl mb-2 tracking-wide"
                   style={{ fontStyle: "italic" }}
                 >
-                  {getGreeting()},
+                  {getGreeting()}
+                  {firstName ? "," : ""}
                 </p>
-                <h1 className="font-display font-bold text-white text-5xl tracking-tight">
-                  {firstName}
-                </h1>
+                {firstName && (
+                  <h1 className="font-display font-bold text-white text-5xl tracking-tight">
+                    {firstName}
+                  </h1>
+                )}
+                {!firstName && (
+                  <p className="font-display text-white/60 text-lg mt-2">
+                    Welcome to Colour Clash
+                  </p>
+                )}
               </>
             )}
             <div className="mt-8 flex justify-center gap-2">
@@ -110,7 +123,7 @@ export default function GreetingOverlay() {
                   style={{ backgroundColor: color }}
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ delay: 0.4 + i * 0.08 }}
+                  transition={{ delay: 0.3 + i * 0.08 }}
                 />
               ))}
             </div>

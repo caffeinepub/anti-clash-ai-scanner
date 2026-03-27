@@ -43,6 +43,55 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 // OTP email verification state machine
 type VerifyStep = "idle" | "code-sent" | "verified";
 
+// Compress image to avoid localStorage quota issues
+async function compressImage(dataUrl: string, maxKb = 200): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let { width, height } = img;
+      const max = 400;
+      if (width > max || height > max) {
+        const scale = Math.min(max / width, max / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      let quality = 0.8;
+      let result = canvas.toDataURL("image/jpeg", quality);
+      while (result.length > maxKb * 1024 && quality > 0.2) {
+        quality -= 0.1;
+        result = canvas.toDataURL("image/jpeg", quality);
+      }
+      resolve(result);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function lsSet(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* quota */
+  }
+}
+function lsGet(key: string): string {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
 function EmailVerificationCard({
   email,
   onVerified,
@@ -51,10 +100,7 @@ function EmailVerificationCard({
   onVerified: () => void;
 }) {
   const storageKey = `emailVerified_${email}`;
-  const isAlreadyVerified =
-    typeof window !== "undefined"
-      ? localStorage.getItem(storageKey) === "true"
-      : false;
+  const isAlreadyVerified = lsGet(storageKey) === "true";
 
   const [step, setStep] = useState<VerifyStep>(
     isAlreadyVerified ? "verified" : "idle",
@@ -64,10 +110,8 @@ function EmailVerificationCard({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState("");
 
-  // Reset when email changes
   useEffect(() => {
-    const alreadyDone =
-      localStorage.getItem(`emailVerified_${email}`) === "true";
+    const alreadyDone = lsGet(`emailVerified_${email}`) === "true";
     setStep(alreadyDone ? "verified" : "idle");
     setOtpValue("");
     setGeneratedCode("");
@@ -80,7 +124,6 @@ function EmailVerificationCard({
       return;
     }
     setIsSending(true);
-    // Simulate a brief send delay
     setTimeout(() => {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedCode(code);
@@ -94,7 +137,7 @@ function EmailVerificationCard({
 
   const handleVerify = () => {
     if (otpValue === generatedCode) {
-      localStorage.setItem(storageKey, "true");
+      lsSet(storageKey, "true");
       setStep("verified");
       setError("");
       toast.success("Email verified successfully! ✨");
@@ -128,7 +171,6 @@ function EmailVerificationCard({
       className="rounded-2xl border border-border/60 overflow-hidden bg-muted/10"
       data-ocid="profile.card"
     >
-      {/* Step indicator */}
       <div className="flex items-center gap-0 border-b border-border/40">
         {(["Enter Email", "Get Code", "Verified ✓"] as const).map(
           (label, i) => {
@@ -220,7 +262,6 @@ function EmailVerificationCard({
                   Enter the code below to verify
                 </p>
               </div>
-
               <InputOTP
                 maxLength={6}
                 value={otpValue}
@@ -236,8 +277,6 @@ function EmailVerificationCard({
                   <InputOTPSlot index={5} />
                 </InputOTPGroup>
               </InputOTP>
-
-              {/* Demo hint */}
               <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl w-full text-center">
                 <p className="text-xs text-amber-700">
                   Demo code:{" "}
@@ -246,7 +285,6 @@ function EmailVerificationCard({
                   </span>
                 </p>
               </div>
-
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -257,7 +295,6 @@ function EmailVerificationCard({
                   {error}
                 </motion.p>
               )}
-
               <Button
                 type="button"
                 onClick={handleVerify}
@@ -268,7 +305,6 @@ function EmailVerificationCard({
                 <CheckCircle2 className="w-4 h-4" />
                 Verify Code
               </Button>
-
               <button
                 type="button"
                 onClick={() => {
@@ -295,31 +331,72 @@ export default function ProfilePage() {
 
   const isLoggedIn = identity && !identity.getPrincipal().isAnonymous();
 
-  const [displayName, setDisplayName] = useState("");
-  const [email, setEmail] = useState("");
-  const [dob, setDob] = useState("");
-  const [gender, setGender] = useState<"men" | "women" | "all">("all");
+  const [displayName, setDisplayName] = useState(() =>
+    lsGet("colourclash_displayName"),
+  );
+  const [email, setEmail] = useState(() => lsGet("colourclash_email"));
+  const [dob, setDob] = useState(() => lsGet("colourclash_dob"));
+  const [gender, setGender] = useState<"men" | "women" | "all">(
+    () => (lsGet("colourclash_gender") as "men" | "women" | "all") || "all",
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(() =>
-    localStorage.getItem("profilePhotoUrl"),
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(
+    () => lsGet("profilePhotoUrl") || null,
   );
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // When backend profile loads, merge with localStorage (backend wins if set)
+  useEffect(() => {
+    if (!userProfile) return;
+    if (userProfile.displayName) {
+      setDisplayName(userProfile.displayName);
+      lsSet("colourclash_displayName", userProfile.displayName);
+    }
+    if (userProfile.email) {
+      setEmail(userProfile.email);
+      lsSet("colourclash_email", userProfile.email);
+    }
+    if (userProfile.gender) {
+      setGender(userProfile.gender as "men" | "women" | "all");
+      lsSet("colourclash_gender", userProfile.gender);
+    }
+  }, [userProfile]);
+
+  // Sync email verified state
+  useEffect(() => {
+    const deviceVerified = email && lsGet(`emailVerified_${email}`) === "true";
+    setIsEmailVerified(!!(userProfile?.emailVerified || deviceVerified));
+  }, [email, userProfile]);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setProfilePhotoUrl(dataUrl);
-      localStorage.setItem("profilePhotoUrl", dataUrl);
-      window.dispatchEvent(new Event("profilePhotoUpdated"));
+    reader.onload = async (ev) => {
+      const rawDataUrl = ev.target?.result as string;
+      try {
+        const compressed = await compressImage(rawDataUrl);
+        setProfilePhotoUrl(compressed);
+        lsSet("profilePhotoUrl", compressed);
+        window.dispatchEvent(new Event("profilePhotoUpdated"));
+        toast.success("Profile photo updated!");
+      } catch {
+        setProfilePhotoUrl(rawDataUrl);
+        lsSet("profilePhotoUrl", rawDataUrl);
+        window.dispatchEvent(new Event("profilePhotoUpdated"));
+      }
     };
     reader.readAsDataURL(file);
+  };
+
+  // Save gender immediately when changed
+  const handleGenderChange = (g: "men" | "women" | "all") => {
+    setGender(g);
+    lsSet("colourclash_gender", g);
   };
 
   const handleDownloadLogo = async () => {
@@ -338,7 +415,6 @@ export default function ProfilePage() {
       URL.revokeObjectURL(url);
       toast.success("Logo saved!");
     } catch {
-      // Fallback: open in new tab (user can long-press to save on mobile)
       window.open(
         "/assets/generated/colour-clash-logo.dim_800x300.png",
         "_blank",
@@ -347,48 +423,6 @@ export default function ProfilePage() {
     }
   };
 
-  useEffect(() => {
-    if (userProfile) {
-      setDisplayName(
-        userProfile.displayName ||
-          localStorage.getItem("colourclash_displayName") ||
-          "",
-      );
-      setEmail(
-        userProfile.email || localStorage.getItem("colourclash_email") || "",
-      );
-      setGender(
-        (userProfile.gender as "men" | "women" | "all") ||
-          (localStorage.getItem("colourclash_gender") as
-            | "men"
-            | "women"
-            | "all") ||
-          "all",
-      );
-    } else {
-      // Fallback: populate from localStorage when backend hasn't loaded yet
-      const savedName = localStorage.getItem("colourclash_displayName") || "";
-      const savedEmail = localStorage.getItem("colourclash_email") || "";
-      const savedGender =
-        (localStorage.getItem("colourclash_gender") as
-          | "men"
-          | "women"
-          | "all") || "all";
-      if (savedName) setDisplayName(savedName);
-      if (savedEmail) setEmail(savedEmail);
-      setGender(savedGender);
-    }
-    const savedDob = localStorage.getItem("colourclash_dob") || "";
-    if (savedDob) setDob(savedDob);
-  }, [userProfile]);
-
-  // Sync local email verified state from localStorage
-  useEffect(() => {
-    const deviceVerified =
-      email && localStorage.getItem(`emailVerified_${email}`) === "true";
-    setIsEmailVerified(!!(userProfile?.emailVerified || deviceVerified));
-  }, [email, userProfile]);
-
   const handleSave = async () => {
     if (!displayName.trim()) {
       toast.error("Please enter your display name.");
@@ -396,13 +430,12 @@ export default function ProfilePage() {
     }
     try {
       setIsSaving(true);
-      localStorage.setItem("colourclash_dob", dob);
-      localStorage.setItem("colourclash_displayName", displayName.trim());
-      localStorage.setItem("colourclash_email", email.trim());
-      localStorage.setItem("colourclash_gender", gender);
+      lsSet("colourclash_dob", dob);
+      lsSet("colourclash_displayName", displayName.trim());
+      lsSet("colourclash_email", email.trim());
+      lsSet("colourclash_gender", gender);
       window.dispatchEvent(new Event("profileNameUpdated"));
       toast.success("Profile saved!");
-      // Try backend save in background
       if (actor) {
         const ageFromDob = dob
           ? BigInt(
@@ -461,7 +494,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (isLoadingProfile) {
+  if (isLoadingProfile && !displayName) {
     return (
       <div
         className="flex items-center justify-center py-20"
@@ -604,10 +637,7 @@ export default function ProfilePage() {
               onChange={(e) => setDisplayName(e.target.value)}
               onBlur={(e) => {
                 if (e.target.value.trim()) {
-                  localStorage.setItem(
-                    "colourclash_displayName",
-                    e.target.value.trim(),
-                  );
+                  lsSet("colourclash_displayName", e.target.value.trim());
                   window.dispatchEvent(new Event("profileNameUpdated"));
                 }
               }}
@@ -639,8 +669,6 @@ export default function ProfilePage() {
                 <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
               )}
             </div>
-
-            {/* Trendy OTP verification card */}
             {email.trim() && (
               <EmailVerificationCard
                 email={email.trim()}
@@ -682,7 +710,7 @@ export default function ProfilePage() {
                 <button
                   key={g}
                   type="button"
-                  onClick={() => setGender(g)}
+                  onClick={() => handleGenderChange(g)}
                   className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
                     gender === g
                       ? "bg-primary text-primary-foreground border-primary shadow-md"
@@ -741,7 +769,6 @@ export default function ProfilePage() {
                 <p className="text-[10px] text-muted-foreground/70">
                   Last updated: March 2026
                 </p>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     1. Data Storage &amp; Privacy
@@ -751,23 +778,19 @@ export default function ProfilePage() {
                     scans, outfit history, saved palettes, and preferences — is
                     stored exclusively on your device (phone/browser local
                     storage). Colour Clash does NOT store any personal data on
-                    external servers. No data is transmitted to or retained by
-                    our backend beyond the session.
+                    external servers.
                   </p>
                 </div>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     2. How We Use Your Data
                   </p>
                   <p>
                     Your data is used solely to provide the Colour Clash
-                    experience: personalized fashion recommendations, outfit
-                    scoring, and color harmony analysis. We do not sell, share,
-                    or transmit your data to third parties.
+                    experience. We do not sell, share, or transmit your data to
+                    third parties.
                   </p>
                 </div>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     3. Camera &amp; Internet Usage
@@ -779,23 +802,20 @@ export default function ProfilePage() {
                   <p>
                     <strong>Internet:</strong> Used to connect to AI services
                     (Google Gemini) for fashion advice, and to open retailer
-                    websites when you tap shop links. No camera images are
-                    stored or transmitted.
+                    websites when you tap shop links.
                   </p>
                 </div>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     4. Retailer Links
                   </p>
                   <p>
-                    Clicking "Shop" links opens the respective retailer&apos;s
+                    Clicking "Shop" links opens the respective retailer's
                     website in your browser. Colour Clash is not responsible for
                     the content, pricing, or policies of those external
                     websites.
                   </p>
                 </div>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     5. AI-Generated Content
@@ -803,10 +823,9 @@ export default function ProfilePage() {
                   <p>
                     Fashion advice and outfit scores are generated by AI (Google
                     Gemini) and are for entertainment and style inspiration
-                    purposes only. Results may vary.
+                    purposes only.
                   </p>
                 </div>
-
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground text-xs">
                     6. Limitation of Liability
@@ -816,17 +835,6 @@ export default function ProfilePage() {
                     not liable for fashion decisions made based on AI advice.
                   </p>
                 </div>
-
-                <div className="space-y-1">
-                  <p className="font-semibold text-foreground text-xs">
-                    7. Contact
-                  </p>
-                  <p>
-                    For queries, reach out through the app&apos;s feedback
-                    feature.
-                  </p>
-                </div>
-
                 <div className="rounded-xl bg-muted/40 p-3 mt-2">
                   <p className="text-[10px] font-semibold text-foreground">
                     By using Colour Clash, you agree to these terms.
@@ -861,8 +869,7 @@ export default function ProfilePage() {
                 <DialogTitle>Delete Account</DialogTitle>
                 <DialogDescription>
                   Are you sure you want to permanently delete your account? This
-                  action cannot be undone. All your saved colors and profile
-                  data will be lost.
+                  action cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter className="gap-2">

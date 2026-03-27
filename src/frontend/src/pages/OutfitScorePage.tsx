@@ -508,6 +508,7 @@ export default function OutfitScorePage({
       } else {
         setPhoto(dataUrl);
         setScore(null);
+        setIsAnalyzing(true);
         analyzeOutfit(dataUrl);
       }
     };
@@ -541,6 +542,7 @@ export default function OutfitScorePage({
       const cropped = canvas.toDataURL("image/jpeg", 0.92);
       setPhoto(cropped);
       setCropPhoto(null);
+      setIsAnalyzing(true);
       analyzeOutfit(cropped);
     };
     tempImg.src = cropPhoto;
@@ -550,6 +552,7 @@ export default function OutfitScorePage({
     if (!cropPhoto) return;
     setPhoto(cropPhoto);
     setCropPhoto(null);
+    setIsAnalyzing(true);
     analyzeOutfit(cropPhoto);
   };
 
