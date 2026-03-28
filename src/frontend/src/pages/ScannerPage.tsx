@@ -274,6 +274,13 @@ function getProductsForGarment(
 // ── Retailer config ────────────────────────────────────────────────────────
 const RETAILERS = [
   {
+    key: "indya" as const,
+    label: "House of Indya",
+    badge: "House of Indya",
+    badgeClass: "bg-rose-800 text-white",
+    color: "#9B2335",
+  },
+  {
     key: "amazon" as const,
     label: "Amazon",
     badge: "AMZ",
@@ -316,13 +323,6 @@ const RETAILERS = [
     color: "#FC2779",
   },
   {
-    key: "indya" as const,
-    label: "House of Indya",
-    badge: "House of Indya",
-    badgeClass: "bg-rose-800 text-white",
-    color: "#9B2335",
-  },
-  {
     key: "offduty" as const,
     label: "Offduty India",
     badge: "Offduty",
@@ -360,7 +360,7 @@ function buildRetailerUrl(
     case "nykaa":
       return `https://www.nykaa.com/search/result/?q=${q}`;
     case "indya":
-      return `https://www.houseofindya.com/catalogsearch/result?q=${q}`;
+      return `https://www.houseofindya.com/Colourclash?q=${q}`;
     case "offduty":
       return `https://offduty.in/search?type=product&q=${q}`;
     default:

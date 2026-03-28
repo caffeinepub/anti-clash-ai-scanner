@@ -349,6 +349,9 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>("scanner");
   const [homeKey, setHomeKey] = useState(0);
   const [showProfile, setShowProfile] = useState(false);
+  const [showHoiBanner, setShowHoiBanner] = useState(
+    () => localStorage.getItem("hoi_banner_dismissed") !== "1",
+  );
 
   const handleIntroComplete = useCallback(() => {
     setShowIntro(false);
@@ -442,6 +445,45 @@ function AppContent() {
           </div>
         </div>
       </header>
+
+      {/* House of Indya promotional banner */}
+      {showHoiBanner && (
+        <a
+          href="https://www.houseofindya.com/Colourclash"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full bg-gradient-to-r from-rose-600 to-pink-500 text-white py-2 px-4 relative z-30"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button")) e.preventDefault();
+          }}
+          data-ocid="hoi.banner"
+        >
+          <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xs font-bold shrink-0">
+                🏷️ House of Indya
+              </span>
+              <span className="text-xs text-white/90 truncate">
+                Use <strong>CCFLY</strong> for 5% off at checkout!
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowHoiBanner(false);
+                localStorage.setItem("hoi_banner_dismissed", "1");
+              }}
+              className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white text-xs"
+              aria-label="Dismiss banner"
+              data-ocid="hoi.close_button"
+            >
+              ×
+            </button>
+          </div>
+        </a>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-5 pb-36 overflow-y-auto">

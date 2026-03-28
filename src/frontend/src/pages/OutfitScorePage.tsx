@@ -15,7 +15,14 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SiWhatsapp, SiX } from "react-icons/si";
+import {
+  SiFacebook,
+  SiInstagram,
+  SiPinterest,
+  SiTelegram,
+  SiWhatsapp,
+  SiX,
+} from "react-icons/si";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { getCoupleHarmonyScore } from "../utils/colorUtils";
@@ -404,7 +411,13 @@ export default function OutfitScorePage({
         if (!dataUrl) return;
         rawPhotoRef.current = dataUrl;
         setCropDataUrl(dataUrl);
-        setCropBoxPos({ x: 0, y: 0 });
+        const containerW = Math.min(window.innerWidth - 48, 360);
+        const containerH = Math.round(containerW * 1.4);
+        const boxSize = Math.round(containerW * 0.8);
+        setCropBoxPos({
+          x: Math.round((containerW - boxSize) / 2),
+          y: Math.round((containerH - boxSize) / 2),
+        });
         setPageState("cropping");
       };
       reader.readAsDataURL(file);
@@ -729,6 +742,123 @@ export default function OutfitScorePage({
     setShowShareSheet(false);
   }, [currentEntry]);
 
+  const handleInstagram = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    try {
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Colour Clash Score",
+          text: `My outfit scored ${currentEntry.score}/100! ${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
+      }
+    } catch {
+      /* fallback */
+    }
+    const blob2 = await buildShareImage(
+      currentEntry.photoDataUrl,
+      currentEntry.score,
+      mode === "couple",
+    );
+    const url = URL.createObjectURL(blob2);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "colour-clash-score.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.open("https://www.instagram.com/", "_blank");
+    toast.success("Image downloaded! Share it on Instagram.");
+    setShowShareSheet(false);
+  }, [currentEntry, mode]);
+
+  const handleFacebook = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    try {
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Colour Clash Score",
+          text: `My outfit scored ${currentEntry.score}/100! ${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
+      }
+    } catch {
+      /* fallback */
+    }
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(APP_LINK)}`,
+      "_blank",
+    );
+    setShowShareSheet(false);
+  }, [currentEntry, mode]);
+
+  const handleTelegram = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    const text =
+      encodeURIComponent(`My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨
+${APP_LINK}`);
+    try {
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Colour Clash Score",
+          text: `My outfit scored ${currentEntry.score}/100! ${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
+      }
+    } catch {
+      /* fallback */
+    }
+    window.open(
+      `https://t.me/share/url?url=${encodeURIComponent(APP_LINK)}&text=${text}`,
+      "_blank",
+    );
+    setShowShareSheet(false);
+  }, [currentEntry, mode]);
+
+  const handlePinterest = useCallback(async () => {
+    if (!currentEntry) return;
+    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    window.open(
+      `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(APP_LINK)}&description=${encodeURIComponent(`My outfit scored ${currentEntry.score}/100 on Colour Clash!`)}`,
+      "_blank",
+    );
+    setShowShareSheet(false);
+  }, [currentEntry]);
+
   const handleRetry = useCallback(() => {
     setCroppedPhoto("");
     setCropDataUrl("");
@@ -982,6 +1112,11 @@ export default function OutfitScorePage({
             <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-white rounded-tr" />
             <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-white rounded-bl" />
             <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-white rounded-br" />
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
+              <span className="text-white text-[10px] font-medium bg-black/40 rounded-full px-2 py-0.5">
+                ↔ Drag to reposition
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1011,7 +1146,17 @@ export default function OutfitScorePage({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      className="flex flex-col items-center gap-4"
     >
+      {croppedPhoto && (
+        <div className="w-48 h-48 rounded-2xl overflow-hidden border border-border shadow-md">
+          <img
+            src={croppedPhoto}
+            alt="outfit preview"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
       <LoadingPulse label="Checking for a person..." />
     </motion.div>
   );
@@ -1021,7 +1166,17 @@ export default function OutfitScorePage({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      className="flex flex-col items-center gap-4"
     >
+      {croppedPhoto && (
+        <div className="w-48 h-48 rounded-2xl overflow-hidden border border-border shadow-md">
+          <img
+            src={croppedPhoto}
+            alt="outfit preview"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
       <LoadingPulse label="Analysing your outfit..." />
     </motion.div>
   );
@@ -1342,53 +1497,168 @@ export default function OutfitScorePage({
 
         {/* Share sheet */}
         <AnimatePresence>
-          {showShareSheet && (
+          {showShareSheet && currentEntry && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="mt-4 rounded-2xl border border-border p-4 flex flex-col gap-2"
+              exit={{ opacity: 0, y: 30 }}
+              className="fixed inset-0 z-50 flex items-end"
+              onClick={() => setShowShareSheet(false)}
               data-ocid="score.popover"
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-bold">Share your score</span>
+              <dialog
+                open
+                className="w-full max-w-lg mx-auto bg-background rounded-t-2xl border-t border-border p-4 pb-8 shadow-2xl static m-0"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+                <h3 className="text-sm font-bold mb-3 text-center">
+                  Share your score
+                </h3>
+
+                {/* Score preview thumbnail */}
+                <div className="flex justify-center mb-4">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border">
+                    <img
+                      src={currentEntry.photoDataUrl}
+                      alt="score"
+                      className="w-full h-full object-cover"
+                    />
+                    <div
+                      className="absolute bottom-1 right-1 rounded-full w-8 h-8 flex items-center justify-center text-white text-xs font-bold shadow"
+                      style={{ background: getScoreColor(currentEntry.score) }}
+                    >
+                      {currentEntry.score}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {/* WhatsApp */}
+                  <button
+                    type="button"
+                    onClick={handleWhatsApp}
+                    className="flex flex-col items-center gap-1.5"
+                    data-ocid="score.share.button"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#25D366] flex items-center justify-center">
+                      <SiWhatsapp className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      WhatsApp
+                    </span>
+                  </button>
+                  {/* Instagram */}
+                  <button
+                    type="button"
+                    onClick={handleInstagram}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)",
+                      }}
+                    >
+                      <SiInstagram className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Instagram
+                    </span>
+                  </button>
+                  {/* Facebook */}
+                  <button
+                    type="button"
+                    onClick={handleFacebook}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#1877F2] flex items-center justify-center">
+                      <SiFacebook className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Facebook
+                    </span>
+                  </button>
+                  {/* Twitter/X */}
+                  <button
+                    type="button"
+                    onClick={handleTwitter}
+                    className="flex flex-col items-center gap-1.5"
+                    data-ocid="score.share.button"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center">
+                      <SiX className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      X / Twitter
+                    </span>
+                  </button>
+                  {/* Telegram */}
+                  <button
+                    type="button"
+                    onClick={handleTelegram}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#0088CC] flex items-center justify-center">
+                      <SiTelegram className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Telegram
+                    </span>
+                  </button>
+                  {/* Pinterest */}
+                  <button
+                    type="button"
+                    onClick={handlePinterest}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#E60023] flex items-center justify-center">
+                      <SiPinterest className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Pinterest
+                    </span>
+                  </button>
+                  {/* Download */}
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="flex flex-col items-center gap-1.5"
+                    data-ocid="score.secondary_button"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
+                      <Download className="w-6 h-6 text-primary-foreground" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Download
+                    </span>
+                  </button>
+                  {/* Copy Link */}
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="flex flex-col items-center gap-1.5"
+                    data-ocid="score.copy.button"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                      <Copy className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      Copy Link
+                    </span>
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowShareSheet(false)}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="w-full py-2.5 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="score.cancel_button"
                 >
-                  ×
+                  Cancel
                 </button>
-              </div>
-              <button
-                type="button"
-                onClick={handleWhatsApp}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-green-50 dark:bg-green-950/20 hover:bg-green-100 transition-colors"
-                data-ocid="score.share.button"
-              >
-                <SiWhatsapp className="w-5 h-5 text-green-600" />
-                <span className="text-sm font-medium">Share on WhatsApp</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleTwitter}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted hover:bg-muted/70 transition-colors"
-                data-ocid="score.share.button"
-              >
-                <SiX className="w-5 h-5" />
-                <span className="text-sm font-medium">
-                  Share on X (Twitter)
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted hover:bg-muted/70 transition-colors"
-                data-ocid="score.copy.button"
-              >
-                <Copy className="w-5 h-5" />
-                <span className="text-sm font-medium">Copy link</span>
-              </button>
+              </dialog>
             </motion.div>
           )}
         </AnimatePresence>

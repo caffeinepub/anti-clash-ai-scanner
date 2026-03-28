@@ -5,6 +5,16 @@ import ColorPaletteCard from "../components/ColorPaletteCard";
 
 const RETAILERS = [
   {
+    key: "indya",
+    name: "House of Indya",
+    color: "#9B2335",
+    deal: "Ethnic Fiesta",
+    discount: "Upto 40% off on kurtas & sarees",
+    url: "https://www.houseofindya.com/Colourclash",
+    paletteHex: "#9B2335",
+    category: "ethnic",
+  },
+  {
     key: "amazon",
     name: "Amazon",
     color: "#FF9900",
@@ -63,16 +73,6 @@ const RETAILERS = [
     url: "https://www.nykaa.com/fashion",
     paletteHex: "#FC2779",
     category: "bag",
-  },
-  {
-    key: "indya",
-    name: "House of Indya",
-    color: "#9B2335",
-    deal: "Ethnic Fiesta",
-    discount: "Upto 40% off on kurtas & sarees",
-    url: "https://www.houseofindya.com/sale",
-    paletteHex: "#9B2335",
-    category: "ethnic",
   },
   {
     key: "offduty",
@@ -150,8 +150,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "House of Indya",
     retailerColor: "#9B2335",
     category: "Ethnic",
-    retailerUrl:
-      "https://www.houseofindya.com/catalogsearch/result?q=silk+banarasi+saree",
+    retailerUrl: "https://www.houseofindya.com/Colourclash",
     paletteHex: "#9B2335",
     itemCategory: "ethnic",
   },
@@ -235,8 +234,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
     retailer: "House of Indya",
     retailerColor: "#9B2335",
     category: "Ethnic",
-    retailerUrl:
-      "https://www.houseofindya.com/catalogsearch/result?q=cotton+anarkali+kurta",
+    retailerUrl: "https://www.houseofindya.com/Colourclash",
     paletteHex: "#E8B4A0",
     itemCategory: "ethnic",
   },
