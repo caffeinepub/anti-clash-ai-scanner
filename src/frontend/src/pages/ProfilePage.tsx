@@ -704,6 +704,7 @@ export default function ProfilePage({
               Style Preference
             </Label>
             <div
+              key={`style-pref-${gender}`}
               className="flex gap-2"
               role="radiogroup"
               aria-label="Gender preference"
@@ -848,60 +849,76 @@ export default function ProfilePage({
         </Accordion>
       </div>
 
-      {/* Delete Account */}
-      <div className="ios-card overflow-hidden">
-        <div className="px-4 py-3 bg-muted/20">
-          <h3 className="ios-section-header mb-0">Danger Zone</h3>
-        </div>
-        <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
-        <div className="p-4">
-          <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full gap-2 rounded-2xl h-12 font-semibold text-sm text-destructive border-destructive/30 hover:bg-destructive/10"
-                data-ocid="profile.delete_button"
+      {/* Delete Account - Danger Zone (hidden by default) */}
+      <Accordion type="single" collapsible className="ios-card overflow-hidden">
+        <AccordionItem value="danger" className="border-none">
+          <AccordionTrigger className="px-4 py-3.5 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm text-destructive">
+                ⚠️ Danger Zone
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                Hidden for safety
+              </span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="p-4">
+              <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={setDeleteDialogOpen}
               >
-                <Trash2 className="w-4 h-4" />
-                Delete Account
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-2xl" data-ocid="profile.dialog">
-              <DialogHeader>
-                <DialogTitle>Delete Account</DialogTitle>
-                <DialogDescription>
-                  Are you sure you want to permanently delete your account? This
-                  action cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setDeleteDialogOpen(false)}
-                  className="rounded-xl"
-                  data-ocid="profile.cancel_button"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteAccount}
-                  disabled={isDeleting}
-                  className="rounded-xl gap-2"
-                  data-ocid="profile.confirm_button"
-                >
-                  {isDeleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 rounded-2xl h-12 font-semibold text-sm text-destructive border-destructive/30 hover:bg-destructive/10"
+                    data-ocid="profile.delete_button"
+                  >
                     <Trash2 className="w-4 h-4" />
-                  )}
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+                    Delete Account
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  className="rounded-2xl"
+                  data-ocid="profile.dialog"
+                >
+                  <DialogHeader>
+                    <DialogTitle>Delete Account</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to permanently delete your account?
+                      This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setDeleteDialogOpen(false)}
+                      className="rounded-xl"
+                      data-ocid="profile.cancel_button"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="rounded-xl gap-2"
+                      data-ocid="profile.confirm_button"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </motion.div>
   );
 }

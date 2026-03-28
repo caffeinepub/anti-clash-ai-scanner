@@ -169,11 +169,11 @@ function setLikeCount(id: string, count: number) {
   localStorage.setItem(`cc_likecount_${id}`, String(count));
 }
 
-// Crop a dataUrl to a 1:1 square (600x600) using crop box position
-// cropBox: {x, y, size} in container coordinates (object-contain layout)
-function cropToSquare(
+// Crop a dataUrl to free dimensions using crop box position
+// cropBox: {x, y, w, h} in container coordinates (object-contain layout)
+function cropImage(
   dataUrl: string,
-  cropBox: { x: number; y: number; size: number },
+  cropBox: { x: number; y: number; w: number; h: number },
   containerW: number,
   containerH: number,
 ): Promise<string> {
@@ -181,8 +181,10 @@ function cropToSquare(
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = 600;
-      canvas.height = 600;
+      const outW = Math.round(cropBox.w * 2);
+      const outH = Math.round(cropBox.h * 2);
+      canvas.width = outW;
+      canvas.height = outH;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         resolve(dataUrl);
@@ -201,9 +203,10 @@ function cropToSquare(
       // Map crop box from container coords to image source coords
       const srcX = Math.max(0, (cropBox.x - letterboxX) / scaleToFit);
       const srcY = Math.max(0, (cropBox.y - letterboxY) / scaleToFit);
-      const srcSize = cropBox.size / scaleToFit;
+      const srcW = cropBox.w / scaleToFit;
+      const srcH = cropBox.h / scaleToFit;
 
-      ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, 600, 600);
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
       resolve(canvas.toDataURL("image/jpeg", 0.95));
     };
     img.onerror = () => resolve(dataUrl);
@@ -246,65 +249,183 @@ function drawCoupleBoundingBoxes(
   ctx.fillText("P2", w / 2 + 16, 23);
 }
 
-// Build a shareable composite PNG (1080x1080)
+// Derive a short harmony label from score
+function getHarmonyLabel(score: number): string {
+  if (score >= 90) return "Perfect Harmony";
+  if (score >= 75) return "Great Contrast";
+  if (score >= 60) return "Colour Clash Pro";
+  return "Bold & Brave";
+}
+
+// Build a shareable composite PNG (9:16 portrait, 1080x1920)
 async function buildShareImage(
   photoDataUrl: string,
   score: number,
   isCouple: boolean,
+  analysisText: string,
 ): Promise<Blob> {
+  const W = 1080;
+  const H = 1920;
   const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1080;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas unavailable");
 
-  // Draw photo
+  // Draw photo full-bleed
   const img = new Image();
+  img.crossOrigin = "anonymous";
   await new Promise<void>((res, rej) => {
     img.onload = () => res();
     img.onerror = () => rej(new Error("img load failed"));
     img.src = photoDataUrl;
   });
-  ctx.drawImage(img, 0, 0, 1080, 1080);
+  // Cover fill
+  const imgAR = img.naturalWidth / img.naturalHeight;
+  const canvasAR = W / H;
+  let sx = 0;
+  let sy = 0;
+  let sw = img.naturalWidth;
+  let sh = img.naturalHeight;
+  if (imgAR > canvasAR) {
+    sw = img.naturalHeight * canvasAR;
+    sx = (img.naturalWidth - sw) / 2;
+  } else {
+    sh = img.naturalWidth / canvasAR;
+    sy = (img.naturalHeight - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
 
   // Couple bounding boxes
   if (isCouple) {
     ctx.strokeStyle = "#3B82F6";
-    ctx.lineWidth = 6;
-    ctx.setLineDash([16, 8]);
-    ctx.strokeRect(16, 16, 520, 1048);
+    ctx.lineWidth = 8;
+    ctx.setLineDash([20, 10]);
+    ctx.strokeRect(20, 20, W / 2 - 30, H - 40);
     ctx.strokeStyle = "#EC4899";
-    ctx.strokeRect(544, 16, 520, 1048);
+    ctx.strokeRect(W / 2 + 10, 20, W / 2 - 30, H - 40);
     ctx.setLineDash([]);
+    // Labels
+    ctx.fillStyle = "rgba(59,130,246,0.88)";
+    ctx.fillRect(20, 20, 60, 32);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 20px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("P1", 34, 41);
+    ctx.fillStyle = "rgba(236,72,153,0.88)";
+    ctx.fillRect(W / 2 + 10, 20, 60, 32);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("P2", W / 2 + 24, 41);
   }
 
-  // Dark gradient at bottom
-  const grad = ctx.createLinearGradient(0, 600, 0, 1080);
-  grad.addColorStop(0, "transparent");
-  grad.addColorStop(1, "rgba(0,0,0,0.85)");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 1080, 1080);
+  // Top gradient (for text readability)
+  const topGrad = ctx.createLinearGradient(0, 0, 0, 280);
+  topGrad.addColorStop(0, "rgba(0,0,0,0.62)");
+  topGrad.addColorStop(1, "transparent");
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, W, 280);
 
-  // Score badge (top right)
-  ctx.fillStyle = getScoreColor(score);
-  ctx.beginPath();
-  ctx.arc(950, 130, 90, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 52px system-ui";
-  ctx.textAlign = "center";
-  ctx.fillText(String(score), 950, 145);
-  ctx.font = "bold 26px system-ui";
-  ctx.fillText("/100", 950, 182);
+  // Bottom gradient
+  const botGrad = ctx.createLinearGradient(0, H * 0.62, 0, H);
+  botGrad.addColorStop(0, "transparent");
+  botGrad.addColorStop(1, "rgba(0,0,0,0.92)");
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H * 0.62, W, H * 0.38);
 
-  // App branding (bottom left)
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 42px system-ui";
+  // Top-left: "Colour" / "Clash" bold white
   ctx.textAlign = "left";
-  ctx.fillText("COLOUR CLASH", 60, 980);
-  ctx.font = "26px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
-  ctx.fillText("just fly with it... • colourclash-emb.caffeine.xyz", 60, 1024);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 72px system-ui, sans-serif";
+  ctx.fillText("Colour", 50, 100);
+  ctx.fillText("Clash", 50, 178);
+
+  // Top-right: score circle
+  const cx = W - 120;
+  const cy = 140;
+  const radius = 98;
+  // Circle background
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fill();
+  // Border
+  ctx.strokeStyle = getScoreColor(score);
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  // Score number
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 80px system-ui";
+  ctx.fillText(String(score), cx, cy + 22);
+  // "CLASH SCORE" label
+  ctx.font = "bold 18px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.letterSpacing = "2px";
+  ctx.fillText("CLASH SCORE", cx, cy + 56);
+  ctx.letterSpacing = "0px";
+
+  // TEACHER'S NOTE section
+  const noteY = H - 280;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 28px system-ui";
+  ctx.fillText("TEACHER'S NOTE:", 50, noteY);
+
+  // Wrap analysis text (max ~55 chars per line, 3 lines)
+  ctx.font = "22px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  const maxLineW = W - 230; // leave room for QR
+  const words = analysisText.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxLineW && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length >= 3) break;
+    } else {
+      line = test;
+    }
+  }
+  if (lines.length < 3 && line) lines.push(line);
+  lines.slice(0, 3).forEach((l, i) => {
+    ctx.fillText(l, 50, noteY + 38 + i * 30);
+  });
+
+  // QR code bottom-right
+  const qrSize = 120;
+  const qrX = W - qrSize - 40;
+  const qrY = H - qrSize - 40;
+  try {
+    const qrImg = new Image();
+    qrImg.crossOrigin = "anonymous";
+    await new Promise<void>((res) => {
+      qrImg.onload = () => res();
+      qrImg.onerror = () => res(); // skip if fails
+      qrImg.src =
+        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://colourclash-emb.caffeine.xyz&bgcolor=ffffff&color=000000";
+    });
+    if (qrImg.complete && qrImg.naturalWidth > 0) {
+      // White background for QR
+      ctx.fillStyle = "#ffffff";
+      ctx.roundRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 8);
+      ctx.fill();
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+    }
+  } catch {
+    // QR load failed, skip
+  }
+
+  // Rotated "Scan to solve your clash" text beside QR
+  ctx.save();
+  ctx.translate(qrX - 18, qrY + qrSize / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.font = "16px system-ui";
+  ctx.fillText("Scan to solve your clash", 0, 0);
+  ctx.restore();
 
   return new Promise<Blob>((res, rej) =>
     canvas.toBlob(
@@ -336,6 +457,20 @@ function LoadingPulse({ label }: { label: string }) {
   );
 }
 
+// ---- Share Image Helper ---------------------------------------------------
+
+function downloadImageBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast.success("Image saved to your device! Paste it when sharing 📎");
+}
+
 // ---- Main Component -------------------------------------------------------
 
 export default function OutfitScorePage({
@@ -356,11 +491,21 @@ export default function OutfitScorePage({
   const [cropDataUrl, setCropDataUrl] = useState<string>("");
   const [croppedPhoto, setCroppedPhoto] = useState<string>("");
 
-  // Crop drag state (crop box moves over static image)
+  // Crop drag state (crop box moves over static image, free resize)
   const cropContainerRef = useRef<HTMLDivElement>(null);
   const cropBoxDragging = useRef(false);
   const cropBoxLastPos = useRef({ x: 0, y: 0 });
   const [cropBoxPos, setCropBoxPos] = useState({ x: 0, y: 0 });
+  const [cropBoxSize, setCropBoxSize] = useState({ w: 240, h: 320 });
+  const resizeDragging = useRef<"nw" | "ne" | "sw" | "se" | null>(null);
+  const resizeStartRef = useRef({
+    mouseX: 0,
+    mouseY: 0,
+    boxX: 0,
+    boxY: 0,
+    boxW: 0,
+    boxH: 0,
+  });
 
   // Results
   const [scoreResult, setScoreResult] = useState<OutfitScoreResult | null>(
@@ -413,11 +558,13 @@ export default function OutfitScorePage({
         setCropDataUrl(dataUrl);
         const containerW = Math.min(window.innerWidth - 48, 360);
         const containerH = Math.round(containerW * 1.4);
-        const boxSize = Math.round(containerW * 0.8);
+        const defaultW = Math.round(containerW * 0.88);
+        const defaultH = Math.round(containerH * 0.75);
         setCropBoxPos({
-          x: Math.round((containerW - boxSize) / 2),
-          y: Math.round((containerH - boxSize) / 2),
+          x: Math.round((containerW - defaultW) / 2),
+          y: Math.round((containerH - defaultH) / 2),
         });
+        setCropBoxSize({ w: defaultW, h: defaultH });
         setPageState("cropping");
       };
       reader.readAsDataURL(file);
@@ -433,27 +580,74 @@ export default function OutfitScorePage({
     e.stopPropagation();
   }, []);
 
-  const handleCropPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!cropBoxDragging.current) return;
-    const dx = e.clientX - cropBoxLastPos.current.x;
-    const dy = e.clientY - cropBoxLastPos.current.y;
-    cropBoxLastPos.current = { x: e.clientX, y: e.clientY };
-    setCropBoxPos((prev) => {
-      const containerEl = cropContainerRef.current;
-      const boxSize = containerEl
-        ? Math.min(containerEl.offsetWidth, containerEl.offsetHeight) * 0.8
-        : 240;
-      const maxX = containerEl ? containerEl.offsetWidth - boxSize : 0;
-      const maxY = containerEl ? containerEl.offsetHeight - boxSize : 0;
-      return {
-        x: Math.max(0, Math.min(maxX, prev.x + dx)),
-        y: Math.max(0, Math.min(maxY, prev.y + dy)),
-      };
-    });
-  }, []);
+  const handleCropPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (resizeDragging.current) {
+        const corner = resizeDragging.current;
+        const start = resizeStartRef.current;
+        const dx = e.clientX - start.mouseX;
+        const dy = e.clientY - start.mouseY;
+        const containerEl = cropContainerRef.current;
+        const cW = containerEl?.offsetWidth ?? 360;
+        const cH = containerEl?.offsetHeight ?? 504;
+        const minSize = 60;
+        let newX = start.boxX;
+        let newY = start.boxY;
+        let newW = start.boxW;
+        let newH = start.boxH;
+        if (corner === "nw") {
+          newX = Math.max(
+            0,
+            Math.min(start.boxX + dx, start.boxX + start.boxW - minSize),
+          );
+          newY = Math.max(
+            0,
+            Math.min(start.boxY + dy, start.boxY + start.boxH - minSize),
+          );
+          newW = start.boxW - (newX - start.boxX);
+          newH = start.boxH - (newY - start.boxY);
+        } else if (corner === "ne") {
+          newY = Math.max(
+            0,
+            Math.min(start.boxY + dy, start.boxY + start.boxH - minSize),
+          );
+          newW = Math.max(minSize, Math.min(start.boxW + dx, cW - start.boxX));
+          newH = start.boxH - (newY - start.boxY);
+        } else if (corner === "sw") {
+          newX = Math.max(
+            0,
+            Math.min(start.boxX + dx, start.boxX + start.boxW - minSize),
+          );
+          newW = start.boxW - (newX - start.boxX);
+          newH = Math.max(minSize, Math.min(start.boxH + dy, cH - start.boxY));
+        } else if (corner === "se") {
+          newW = Math.max(minSize, Math.min(start.boxW + dx, cW - start.boxX));
+          newH = Math.max(minSize, Math.min(start.boxH + dy, cH - start.boxY));
+        }
+        setCropBoxPos({ x: newX, y: newY });
+        setCropBoxSize({ w: newW, h: newH });
+        return;
+      }
+      if (!cropBoxDragging.current) return;
+      const dx = e.clientX - cropBoxLastPos.current.x;
+      const dy = e.clientY - cropBoxLastPos.current.y;
+      cropBoxLastPos.current = { x: e.clientX, y: e.clientY };
+      setCropBoxPos((prev) => {
+        const containerEl = cropContainerRef.current;
+        const maxX = containerEl ? containerEl.offsetWidth - cropBoxSize.w : 0;
+        const maxY = containerEl ? containerEl.offsetHeight - cropBoxSize.h : 0;
+        return {
+          x: Math.max(0, Math.min(maxX, prev.x + dx)),
+          y: Math.max(0, Math.min(maxY, prev.y + dy)),
+        };
+      });
+    },
+    [cropBoxSize.w, cropBoxSize.h],
+  );
 
   const handleCropPointerUp = useCallback(() => {
     cropBoxDragging.current = false;
+    resizeDragging.current = null;
   }, []);
 
   const handleCropConfirm = useCallback(async () => {
@@ -461,10 +655,9 @@ export default function OutfitScorePage({
     const containerEl = cropContainerRef.current;
     const containerW = containerEl?.offsetWidth ?? 300;
     const containerH = containerEl?.offsetHeight ?? 420;
-    const boxSize = Math.min(containerW, containerH) * 0.8;
-    const cropped = await cropToSquare(
+    const cropped = await cropImage(
       cropDataUrl,
-      { x: cropBoxPos.x, y: cropBoxPos.y, size: boxSize },
+      { x: cropBoxPos.x, y: cropBoxPos.y, w: cropBoxSize.w, h: cropBoxSize.h },
       containerW,
       containerH,
     );
@@ -596,7 +789,14 @@ export default function OutfitScorePage({
       setLookbook(getLookbook());
       setPageState("results");
     }
-  }, [cropBoxPos.x, cropBoxPos.y, cropDataUrl, mode]);
+  }, [
+    cropBoxPos.x,
+    cropBoxPos.y,
+    cropBoxSize.w,
+    cropBoxSize.h,
+    cropDataUrl,
+    mode,
+  ]);
 
   // Draw couple bounding boxes when results appear
   useEffect(() => {
@@ -634,13 +834,19 @@ export default function OutfitScorePage({
   const handleShare = useCallback(async () => {
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
-    const shareText = `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`;
+    const harmonyLabel = getHarmonyLabel(currentEntry.score);
+    const shareText = `Just got a ${currentEntry.score}/100 on my outfit! 🎨 My AI stylist says this is '${harmonyLabel}'. Think you can beat my score? Scan the QR code to test your fit! #ColourClash\n\n${APP_LINK}`;
+    const analysisText =
+      currentEntry.result?.analysis ??
+      currentEntry.coupleResult?.harmonyAdvice ??
+      "A bold colour story worth telling.";
     try {
       toast.loading("Preparing share...", { id: "share" });
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText,
       );
       toast.dismiss("share");
       const file = new File([blob], "colour-clash-score.png", {
@@ -654,7 +860,8 @@ export default function OutfitScorePage({
         });
         return;
       }
-      // Fallback: open share sheet with download option
+      // Fallback: auto-download image then open share sheet
+      downloadImageBlob(blob, "colour-clash-score.png");
       setShowShareSheet(true);
     } catch (err) {
       toast.dismiss("share");
@@ -667,10 +874,15 @@ export default function OutfitScorePage({
     if (!currentEntry) return;
     try {
       toast.loading("Saving...", { id: "save" });
+      const analysisText =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText,
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -705,11 +917,17 @@ export default function OutfitScorePage({
     const text = encodeURIComponent(
       `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
     );
+    let sharedNatively = false;
     try {
+      const analysisText2 =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText2,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -719,14 +937,18 @@ export default function OutfitScorePage({
           files: [file],
           text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
         });
+        sharedNatively = true;
         setShowShareSheet(false);
         return;
       }
+      downloadImageBlob(blob, "colour-clash-score.png");
     } catch {
       /* fallback */
     }
-    window.open(`https://wa.me/?text=${text}`, "_blank");
-    setShowShareSheet(false);
+    if (!sharedNatively) {
+      window.open(`https://wa.me/?text=${text}`, "_blank");
+      setShowShareSheet(false);
+    }
   }, [currentEntry, mode]);
 
   const handleTwitter = useCallback(async () => {
@@ -735,21 +957,53 @@ export default function OutfitScorePage({
     const text = encodeURIComponent(
       `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨`,
     );
+    try {
+      const analysisTextTw =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+        analysisTextTw,
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨
+${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
+      }
+      downloadImageBlob(blob, "colour-clash-score.png");
+    } catch {
+      /* fallback */
+    }
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(APP_LINK)}`,
       "_blank",
     );
     setShowShareSheet(false);
-  }, [currentEntry]);
+  }, [currentEntry, mode]);
 
   const handleInstagram = useCallback(async () => {
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    const analysisText3 =
+      currentEntry.result?.analysis ??
+      currentEntry.coupleResult?.harmonyAdvice ??
+      "A bold colour story worth telling.";
     try {
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText3,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -770,17 +1024,10 @@ export default function OutfitScorePage({
       currentEntry.photoDataUrl,
       currentEntry.score,
       mode === "couple",
+      analysisText3,
     );
-    const url = URL.createObjectURL(blob2);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "colour-clash-score.png";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadImageBlob(blob2, "colour-clash-score.png");
     window.open("https://www.instagram.com/", "_blank");
-    toast.success("Image downloaded! Share it on Instagram.");
     setShowShareSheet(false);
   }, [currentEntry, mode]);
 
@@ -788,10 +1035,15 @@ export default function OutfitScorePage({
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
     try {
+      const analysisText3 =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText3,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -807,6 +1059,19 @@ export default function OutfitScorePage({
       }
     } catch {
       /* fallback */
+    }
+    {
+      const analysisTextFbFb =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
+      const blobFb = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+        analysisTextFbFb,
+      );
+      downloadImageBlob(blobFb, "colour-clash-score.png");
     }
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(APP_LINK)}`,
@@ -822,10 +1087,15 @@ export default function OutfitScorePage({
       encodeURIComponent(`My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨
 ${APP_LINK}`);
     try {
+      const analysisText3 =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
+        analysisText3,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -842,6 +1112,19 @@ ${APP_LINK}`);
     } catch {
       /* fallback */
     }
+    {
+      const analysisTextTg =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
+      const blobTg = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+        analysisTextTg,
+      );
+      downloadImageBlob(blobTg, "colour-clash-score.png");
+    }
     window.open(
       `https://t.me/share/url?url=${encodeURIComponent(APP_LINK)}&text=${text}`,
       "_blank",
@@ -852,12 +1135,38 @@ ${APP_LINK}`);
   const handlePinterest = useCallback(async () => {
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
+    try {
+      const analysisTextPi =
+        currentEntry.result?.analysis ??
+        currentEntry.coupleResult?.harmonyAdvice ??
+        "A bold colour story worth telling.";
+      const blob = await buildShareImage(
+        currentEntry.photoDataUrl,
+        currentEntry.score,
+        mode === "couple",
+        analysisTextPi,
+      );
+      const file = new File([blob], "colour-clash-score.png", {
+        type: "image/png",
+      });
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! ${APP_LINK}`,
+        });
+        setShowShareSheet(false);
+        return;
+      }
+      downloadImageBlob(blob, "colour-clash-score.png");
+    } catch {
+      /* fallback */
+    }
     window.open(
       `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(APP_LINK)}&description=${encodeURIComponent(`My outfit scored ${currentEntry.score}/100 on Colour Clash!`)}`,
       "_blank",
     );
     setShowShareSheet(false);
-  }, [currentEntry]);
+  }, [currentEntry, mode]);
 
   const handleRetry = useCallback(() => {
     setCroppedPhoto("");
@@ -1029,7 +1338,25 @@ ${APP_LINK}`);
   const renderCropping = () => {
     const containerW = Math.min(window.innerWidth - 48, 360);
     const containerH = Math.round(containerW * 1.4);
-    const boxSize = Math.round(containerW * 0.8);
+    const bw = cropBoxSize.w;
+    const bh = cropBoxSize.h;
+    const bx = cropBoxPos.x;
+    const by = cropBoxPos.y;
+
+    const handleResizeDown =
+      (corner: "nw" | "ne" | "sw" | "se") => (e: React.PointerEvent) => {
+        e.stopPropagation();
+        resizeDragging.current = corner;
+        resizeStartRef.current = {
+          mouseX: e.clientX,
+          mouseY: e.clientY,
+          boxX: bx,
+          boxY: by,
+          boxW: bw,
+          boxH: bh,
+        };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      };
 
     return (
       <motion.div
@@ -1040,11 +1367,9 @@ ${APP_LINK}`);
       >
         {/* Heading */}
         <div className="w-full">
-          <p className="text-sm font-bold text-foreground">
-            Position the crop box ✅
-          </p>
+          <p className="text-sm font-bold text-foreground">Crop your photo ✂️</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Drag the white box to select the area · 1:1 square
+            Drag the box to reposition · Drag corner handles to resize freely
           </p>
         </div>
 
@@ -1059,6 +1384,9 @@ ${APP_LINK}`);
             background: "#111",
             overflow: "hidden",
           }}
+          onPointerMove={handleCropPointerMove}
+          onPointerUp={handleCropPointerUp}
+          onPointerCancel={handleCropPointerUp}
           data-ocid="score.canvas_target"
         >
           {cropDataUrl && (
@@ -1082,20 +1410,19 @@ ${APP_LINK}`);
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.45) 100%)",
-              maskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${cropBoxPos.x} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y + boxSize} L${cropBoxPos.x} ${cropBoxPos.y + boxSize} Z")`,
-              WebkitMaskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${cropBoxPos.x} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y} L${cropBoxPos.x + boxSize} ${cropBoxPos.y + boxSize} L${cropBoxPos.x} ${cropBoxPos.y + boxSize} Z")`,
+              background: "rgba(0,0,0,0.45)",
+              maskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${bx} ${by} L${bx + bw} ${by} L${bx + bw} ${by + bh} L${bx} ${by + bh} Z")`,
+              WebkitMaskImage: `path("M0 0 L${containerW} 0 L${containerW} ${containerH} L0 ${containerH} Z M${bx} ${by} L${bx + bw} ${by} L${bx + bw} ${by + bh} L${bx} ${by + bh} Z")`,
             }}
           />
           {/* Draggable crop box */}
           <div
             style={{
               position: "absolute",
-              left: cropBoxPos.x,
-              top: cropBoxPos.y,
-              width: boxSize,
-              height: boxSize,
+              left: bx,
+              top: by,
+              width: bw,
+              height: bh,
               border: "2px solid rgba(255,255,255,0.9)",
               borderRadius: 8,
               cursor: "grab",
@@ -1103,18 +1430,35 @@ ${APP_LINK}`);
               zIndex: 10,
             }}
             onPointerDown={handleCropPointerDown}
-            onPointerMove={handleCropPointerMove}
-            onPointerUp={handleCropPointerUp}
-            onPointerCancel={handleCropPointerUp}
           >
-            {/* Corner guides */}
-            <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-white rounded-tl" />
-            <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-white rounded-tr" />
-            <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-white rounded-bl" />
-            <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-white rounded-br" />
-            <div className="absolute bottom-2 left-0 right-0 flex justify-center pointer-events-none">
-              <span className="text-white text-[10px] font-medium bg-black/40 rounded-full px-2 py-0.5">
-                ↔ Drag to reposition
+            {/* Corner resize handles */}
+            {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+              <div
+                key={corner}
+                onPointerDown={handleResizeDown(corner)}
+                style={{
+                  position: "absolute",
+                  width: 20,
+                  height: 20,
+                  background: "white",
+                  borderRadius: 3,
+                  zIndex: 20,
+                  cursor:
+                    corner === "nw" || corner === "se"
+                      ? "nwse-resize"
+                      : "nesw-resize",
+                  top: corner.startsWith("n") ? -6 : undefined,
+                  bottom: corner.startsWith("s") ? -6 : undefined,
+                  left: corner.endsWith("w") ? -6 : undefined,
+                  right: corner.endsWith("e") ? -6 : undefined,
+                  touchAction: "none",
+                }}
+              />
+            ))}
+            {/* Dimensions display */}
+            <div className="absolute bottom-1 left-0 right-0 flex justify-center pointer-events-none">
+              <span className="text-white text-[10px] font-medium bg-black/50 rounded-full px-2 py-0.5">
+                {Math.round(bw)} × {Math.round(bh)} · Drag to move
               </span>
             </div>
           </div>
