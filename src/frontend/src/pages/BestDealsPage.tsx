@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import ColorPaletteCard from "../components/ColorPaletteCard";
+import { useFilters } from "../context/FilterContext";
 
 const RETAILERS = [
   {
@@ -313,6 +314,7 @@ const SIMULATED_DEALS: SimulatedDeal[] = [
 ];
 
 export default function BestDealsPage() {
+  const { gender } = useFilters();
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [heroVisible, setHeroVisible] = useState(true);
 
@@ -327,10 +329,30 @@ export default function BestDealsPage() {
     setHeroVisible(false);
   };
 
+  // Phase 1: filter deals by gender
+  const genderFilteredDeals = SIMULATED_DEALS.filter((d) => {
+    if (gender === "male") {
+      const femaleItems = [
+        "Silk Banarasi Saree",
+        "Cotton Anarkali Kurta",
+        "Block Heel Sandals",
+        "Flared Midi Dress",
+        "Tote Handbag",
+        "Mini Sling Bag",
+      ];
+      if (femaleItems.includes(d.name)) return false;
+    } else {
+      const maleItems = ["Slim Fit Jeans", "Casual Sneakers"];
+      if (d.name === "Denim Jacket" && gender === "female") return true;
+      // Keep female-friendly items and exclude male-only
+      if (maleItems.includes(d.name) && gender !== "female") return true;
+    }
+    return true;
+  });
   const filteredDeals =
     activeCategory === "All"
-      ? SIMULATED_DEALS
-      : SIMULATED_DEALS.filter((d) => d.category === activeCategory);
+      ? genderFilteredDeals
+      : genderFilteredDeals.filter((d) => d.category === activeCategory);
 
   return (
     <div className="space-y-5 pb-6">

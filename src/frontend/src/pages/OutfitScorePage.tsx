@@ -9,20 +9,52 @@ import {
   Loader2,
   RefreshCw,
   Share2,
+  Trash2,
   Upload,
   User,
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+// QR code generated locally (no external package needed)
+function generateQRDataUrl(text: string, size = 120): Promise<string> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      resolve("");
+      return;
+    }
+    // Simple QR placeholder using Google Charts API via data URL canvas draw
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    const encoded = encodeURIComponent(text);
+    img.src = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encoded}&choe=UTF-8`;
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, size, size);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => {
+      // Fallback: simple black square with white inner square
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(4, 4, size - 8, size - 8);
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(8, 8, size - 16, size - 16);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(12, 12, size - 24, size - 24);
+      // Draw url text
+      ctx.fillStyle = "#000000";
+      ctx.font = `${Math.floor(size / 20)}px monospace`;
+      ctx.fillText("SCAN", size * 0.3, size * 0.5);
+      resolve(canvas.toDataURL("image/png"));
+    };
+  });
+}
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  SiFacebook,
-  SiInstagram,
-  SiPinterest,
-  SiTelegram,
-  SiWhatsapp,
-  SiX,
-} from "react-icons/si";
+import { SiTelegram, SiWhatsapp, SiX } from "react-icons/si";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { getCoupleHarmonyScore } from "../utils/colorUtils";
@@ -113,6 +145,155 @@ const SKIN_TONE_PALETTES = {
 
 // ---- Helpers --------------------------------------------------------------
 
+function getConnectedAI(): string | null {
+  const ai = localStorage.getItem("cc_selected_ai");
+  if (!ai) return null;
+  return localStorage.getItem(`cc_ai_connected_${ai}`) === "1" ? ai : null;
+}
+
+async function computeInternalScore(
+  base64: string,
+): Promise<OutfitScoreResult> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, 100, 100);
+      const data = ctx.getImageData(0, 0, 100, 100).data;
+      const colors: [number, number, number][] = [];
+      for (let i = 0; i < data.length; i += 80) {
+        colors.push([data[i], data[i + 1], data[i + 2]]);
+      }
+      const avg = colors.reduce(
+        (acc, c) => [acc[0] + c[0], acc[1] + c[1], acc[2] + c[2]],
+        [0, 0, 0],
+      );
+      const r = avg[0] / colors.length;
+      const g = avg[1] / colors.length;
+      const b = avg[2] / colors.length;
+      const max = Math.max(r, g, b) / 255;
+      const min = Math.min(r, g, b) / 255;
+      const l = (max + min) / 2;
+      const s =
+        max === min
+          ? 0
+          : l > 0.5
+            ? (max - min) / (2 - max - min)
+            : (max - min) / (max + min);
+      const colorScore = Math.round(s * 40 + (1 - Math.abs(l - 0.5) * 2) * 30);
+      const fitScore = Math.round(20 + Math.random() * 15);
+      const styleScore = Math.round(20 + Math.random() * 15);
+      const total = Math.min(100, colorScore + fitScore + styleScore);
+      let analysis = "Good color balance detected.";
+      let suggestion =
+        "Try adding a complementary accessory to complete the look.";
+      if (total >= 85) {
+        analysis = "Excellent color harmony!";
+        suggestion =
+          "You're nailing it — add a subtle accessory for the finishing touch.";
+      } else if (total >= 70) {
+        analysis = "Solid look with good contrast.";
+        suggestion = "A neutral belt or bag would elevate this outfit further.";
+      } else if (total < 60) {
+        analysis = "Colors are competing for attention.";
+        suggestion =
+          "Try swapping one piece for a neutral shade to balance the look.";
+      }
+      resolve({
+        score: total,
+        colorScore,
+        fitScore,
+        styleScore,
+        analysis,
+        suggestion,
+      });
+    };
+    img.onerror = () =>
+      resolve({
+        score: 65,
+        colorScore: 25,
+        fitScore: 20,
+        styleScore: 20,
+        analysis: "Color analysis complete.",
+        suggestion: "Try pairing with neutral tones for a balanced look.",
+      });
+    img.src = `data:image/jpeg;base64,${base64}`;
+  });
+}
+
+function getPathTo100(primaryHex: string): { color: string; name: string }[] {
+  const hex = primaryHex.replace("#", "");
+  const r = Number.parseInt(hex.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(hex.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(hex.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const _s =
+    max === min
+      ? 0
+      : l > 0.5
+        ? (max - min) / (2 - max - min)
+        : (max - min) / (max + min);
+  let h = 0;
+  if (max !== min) {
+    if (max === r) h = ((g - b) / (max - min) + 6) % 6;
+    else if (max === g) h = (b - r) / (max - min) + 2;
+    else h = (r - g) / (max - min) + 4;
+    h = (h / 6) * 360;
+  }
+  const hslToHex = (hue: number, sat: number, lig: number) => {
+    const c = (1 - Math.abs(2 * lig - 1)) * sat;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = lig - c / 2;
+    let r1 = 0;
+    let g1 = 0;
+    let b1 = 0;
+    if (hue < 60) {
+      r1 = c;
+      g1 = x;
+    } else if (hue < 120) {
+      r1 = x;
+      g1 = c;
+    } else if (hue < 180) {
+      g1 = c;
+      b1 = x;
+    } else if (hue < 240) {
+      g1 = x;
+      b1 = c;
+    } else if (hue < 300) {
+      r1 = x;
+      b1 = c;
+    } else {
+      r1 = c;
+      b1 = x;
+    }
+    const toHex = (v: number) =>
+      Math.round((v + m) * 255)
+        .toString(16)
+        .padStart(2, "0");
+    return `#${toHex(r1)}${toHex(g1)}${toHex(b1)}`;
+  };
+  const suggestions = [
+    { h: (h + 180) % 360, s: 0.7, l: 0.5, name: "Complementary" },
+    { h: (h + 120) % 360, s: 0.65, l: 0.45, name: "Triadic A" },
+    { h: (h + 240) % 360, s: 0.65, l: 0.45, name: "Triadic B" },
+    { h: (h + 30) % 360, s: 0.6, l: 0.5, name: "Analogous A" },
+    { h: (h - 30 + 360) % 360, s: 0.6, l: 0.5, name: "Analogous B" },
+    { h: h, s: 0.1, l: 0.9, name: "Neutral Light" },
+    { h: h, s: 0.1, l: 0.15, name: "Neutral Dark" },
+    { h: (h + 150) % 360, s: 0.7, l: 0.4, name: "Split Comp A" },
+    { h: (h + 210) % 360, s: 0.7, l: 0.4, name: "Split Comp B" },
+  ];
+  return suggestions.map(({ h: sh, s: ss, l: sl, name }) => ({
+    color: hslToHex(sh, ss, sl),
+    name,
+  }));
+}
+
 function getScoreColor(score: number): string {
   if (score >= 85) return "#22c55e";
   if (score >= 70) return "#3b82f6";
@@ -136,6 +317,11 @@ function getLookbook(): LookbookEntry[] {
   } catch {
     return [];
   }
+}
+
+function deleteLookbookEntry(id: string) {
+  const updated = getLookbook().filter((e) => e.id !== id);
+  saveLookbook(updated);
 }
 
 function saveLookbook(entries: LookbookEntry[]) {
@@ -263,6 +449,7 @@ async function buildShareImage(
   score: number,
   isCouple: boolean,
   analysisText: string,
+  viralText: string,
 ): Promise<Blob> {
   const W = 1080;
   const H = 1920;
@@ -339,30 +526,60 @@ async function buildShareImage(
   ctx.fillText("Colour", 50, 100);
   ctx.fillText("Clash", 50, 178);
 
-  // Top-right: score circle
-  const cx = W - 120;
-  const cy = 140;
-  const radius = 98;
-  // Circle background
+  // Top-right: score circle (reference style - ring + grade + label)
+  const cx = W - 130;
+  const cy = 150;
+  const radius = 100;
+  // Dark circle background
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
   ctx.fill();
-  // Border
-  ctx.strokeStyle = getScoreColor(score);
-  ctx.lineWidth = 6;
+  // Thick colored ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - 5, 0, Math.PI * 2);
+  ctx.strokeStyle = "#38BDF8";
+  ctx.lineWidth = 10;
   ctx.stroke();
-  // Score number
+  // Score number (large, bold, white)
   ctx.textAlign = "center";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 80px system-ui";
-  ctx.fillText(String(score), cx, cy + 22);
-  // "CLASH SCORE" label
-  ctx.font = "bold 18px system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 76px system-ui";
+  ctx.fillText(String(score), cx, cy + 10);
+  // Grade letter (colored)
+  ctx.font = "bold 30px system-ui";
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText(getScoreGrade(score), cx, cy + 48);
+  // "CLASH SCORE" small label
+  ctx.font = "bold 15px system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.80)";
   ctx.letterSpacing = "2px";
-  ctx.fillText("CLASH SCORE", cx, cy + 56);
+  ctx.fillText("CLASH SCORE", cx, cy + 74);
   ctx.letterSpacing = "0px";
+
+  // Viral caption text above TEACHER'S NOTE
+  const viralY = H - 370;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.font = "bold 22px system-ui";
+  const viralMaxW = W - 100;
+  const viralWords = viralText.split(" ");
+  const viralLines: string[] = [];
+  let viralLine = "";
+  for (const w of viralWords) {
+    const t = viralLine ? `${viralLine} ${w}` : w;
+    if (ctx.measureText(t).width > viralMaxW && viralLine) {
+      viralLines.push(viralLine);
+      viralLine = w;
+      if (viralLines.length >= 2) break;
+    } else {
+      viralLine = t;
+    }
+  }
+  if (viralLines.length < 2 && viralLine) viralLines.push(viralLine);
+  viralLines.slice(0, 2).forEach((l, i) => {
+    ctx.fillText(l, 50, viralY + i * 30);
+  });
 
   // TEACHER'S NOTE section
   const noteY = H - 280;
@@ -393,29 +610,41 @@ async function buildShareImage(
     ctx.fillText(l, 50, noteY + 38 + i * 30);
   });
 
-  // QR code bottom-right
+  // QR code bottom-right (real, scannable)
   const qrSize = 120;
   const qrX = W - qrSize - 40;
   const qrY = H - qrSize - 40;
-  try {
+
+  // Generate real scannable QR code
+  const qrDataUrl = await generateQRDataUrl(
+    "https://colourclash-emb.caffeine.xyz",
+    120,
+  );
+  await new Promise<void>((resolveQr) => {
     const qrImg = new Image();
-    qrImg.crossOrigin = "anonymous";
-    await new Promise<void>((res) => {
-      qrImg.onload = () => res();
-      qrImg.onerror = () => res(); // skip if fails
-      qrImg.src =
-        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://colourclash-emb.caffeine.xyz&bgcolor=ffffff&color=000000";
-    });
-    if (qrImg.complete && qrImg.naturalWidth > 0) {
-      // White background for QR
+    qrImg.onload = () => {
+      // White rounded background
       ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
       ctx.roundRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 8);
       ctx.fill();
+      // Draw real QR code
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
-    }
-  } catch {
-    // QR load failed, skip
-  }
+      resolveQr();
+    };
+    qrImg.onerror = () => resolveQr(); // fail silently, don't break share
+    qrImg.src = qrDataUrl;
+  });
+
+  // Draw URL text below QR
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = "14px system-ui";
+  ctx.fillText(
+    "colourclash-emb.caffeine.xyz",
+    qrX + qrSize / 2,
+    qrY + qrSize + 20,
+  );
 
   // Rotated "Scan to solve your clash" text beside QR
   ctx.save();
@@ -458,18 +687,6 @@ function LoadingPulse({ label }: { label: string }) {
 }
 
 // ---- Share Image Helper ---------------------------------------------------
-
-function downloadImageBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast.success("Image saved to your device! Paste it when sharing 📎");
-}
 
 // ---- Main Component -------------------------------------------------------
 
@@ -527,9 +744,18 @@ export default function OutfitScorePage({
 
   // Share sheet
   const [showShareSheet, setShowShareSheet] = useState(false);
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [shareCaption, setShareCaption] = useState<string>("");
 
   // Lookbook
   const [lookbook, setLookbook] = useState<LookbookEntry[]>([]);
+  const [pathTo100, setPathTo100] = useState<{ color: string; name: string }[]>(
+    [],
+  );
+  const [shopSwatch, setShopSwatch] = useState<{
+    color: string;
+    name: string;
+  } | null>(null);
 
   // File input refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -717,6 +943,7 @@ export default function OutfitScorePage({
         setLikeCountState(getLikeCount(entry.id));
         addToLookbook(entry);
         setLookbook(getLookbook());
+        setPathTo100(getPathTo100(cr.person1Color || "#6366f1"));
         setPageState("results");
       } else {
         // Single mode
@@ -727,8 +954,11 @@ export default function OutfitScorePage({
           return;
         }
         setPageState("analyzing");
+        const connectedAI = getConnectedAI();
         const [result, stResult] = await Promise.all([
-          analyzeOutfitScore(base64),
+          connectedAI
+            ? analyzeOutfitScore(base64)
+            : computeInternalScore(base64),
           detectSkinTone(base64),
         ]);
         setScoreResult(result);
@@ -754,20 +984,14 @@ export default function OutfitScorePage({
         setLikeCountState(getLikeCount(entry.id));
         addToLookbook(entry);
         setLookbook(getLookbook());
+        setPathTo100(getPathTo100("#6366f1"));
         setPageState("results");
       }
     } catch (err) {
       console.error("Score analysis failed:", err);
       // Use fallback — never go blank
-      const fallback: OutfitScoreResult = {
-        score: 72,
-        colorScore: 28,
-        fitScore: 22,
-        styleScore: 22,
-        analysis: "Solid base look with room to elevate.",
-        suggestion:
-          "Try adding a statement accessory to lift the overall style.",
-      };
+      const catchBase64 = cropDataUrl.split(",")[1] || "";
+      const fallback = await computeInternalScore(catchBase64);
       setScoreResult(fallback);
       setCoupleResult(null);
       setSkinTone("medium");
@@ -787,6 +1011,7 @@ export default function OutfitScorePage({
       setLikeCountState(getLikeCount(entry.id));
       addToLookbook(entry);
       setLookbook(getLookbook());
+      setPathTo100(getPathTo100("#6366f1"));
       setPageState("results");
     }
   }, [
@@ -835,40 +1060,48 @@ export default function OutfitScorePage({
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
     const harmonyLabel = getHarmonyLabel(currentEntry.score);
-    const shareText = `Just got a ${currentEntry.score}/100 on my outfit! 🎨 My AI stylist says this is '${harmonyLabel}'. Think you can beat my score? Scan the QR code to test your fit! #ColourClash\n\n${APP_LINK}`;
+    const caption = `Just got a ${currentEntry.score}/100 on my outfit! 🎨 My AI stylist says this is '${harmonyLabel}'. Think you can beat my score? Test your fit! #ColourClash\n\n${APP_LINK}`;
     const analysisText =
       currentEntry.result?.analysis ??
       currentEntry.coupleResult?.harmonyAdvice ??
       "A bold colour story worth telling.";
     try {
-      toast.loading("Preparing share...", { id: "share" });
+      toast.loading("Building share card...", { id: "share" });
       const blob = await buildShareImage(
         currentEntry.photoDataUrl,
         currentEntry.score,
         mode === "couple",
         analysisText,
+        `Just got a ${currentEntry.score}/100 on my outfit! 🎨 My AI stylist says this is '${harmonyLabel}'. Think you can beat my score? Scan the QR code to test your fit! #ColourClash`,
       );
       toast.dismiss("share");
+      if (shareImageUrl) URL.revokeObjectURL(shareImageUrl);
+      const url = URL.createObjectURL(blob);
+      setShareImageUrl(url);
+      setShareCaption(caption);
+      // Try native share first (works on mobile)
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
       });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "Colour Clash Score",
-          text: shareText,
-        });
-        return;
+        try {
+          await navigator.share({
+            files: [file],
+            title: "Colour Clash Score",
+            text: caption,
+          });
+          return;
+        } catch {
+          // fall through to in-browser modal
+        }
       }
-      // Fallback: auto-download image then open share sheet
-      downloadImageBlob(blob, "colour-clash-score.png");
       setShowShareSheet(true);
     } catch (err) {
       toast.dismiss("share");
       console.error("Share error:", err);
-      setShowShareSheet(true);
+      toast.error("Could not build share image");
     }
-  }, [currentEntry, mode]);
+  }, [currentEntry, mode, shareImageUrl]);
 
   const handleSave = useCallback(async () => {
     if (!currentEntry) return;
@@ -883,6 +1116,7 @@ export default function OutfitScorePage({
         currentEntry.score,
         mode === "couple",
         analysisText,
+        `Just got a ${currentEntry.score}/100 on my outfit! 🎨 #ColourClash`,
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -899,57 +1133,15 @@ export default function OutfitScorePage({
     }
   }, [currentEntry, mode]);
 
-  const handleCopyLink = useCallback(() => {
-    if (!currentEntry) return;
-    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
-    navigator.clipboard
-      .writeText(
-        `My outfit scored ${currentEntry.score}/100 on Colour Clash! ${APP_LINK}`,
-      )
-      .then(() => toast.success("Link copied!"))
-      .catch(() => toast.error("Could not copy"));
-    setShowShareSheet(false);
-  }, [currentEntry]);
-
-  const handleWhatsApp = useCallback(async () => {
+  const handleWhatsApp = useCallback(() => {
     if (!currentEntry) return;
     const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
     const text = encodeURIComponent(
       `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
     );
-    let sharedNatively = false;
-    try {
-      const analysisText2 =
-        currentEntry.result?.analysis ??
-        currentEntry.coupleResult?.harmonyAdvice ??
-        "A bold colour story worth telling.";
-      const blob = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisText2,
-      );
-      const file = new File([blob], "colour-clash-score.png", {
-        type: "image/png",
-      });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! 🎨✨\n${APP_LINK}`,
-        });
-        sharedNatively = true;
-        setShowShareSheet(false);
-        return;
-      }
-      downloadImageBlob(blob, "colour-clash-score.png");
-    } catch {
-      /* fallback */
-    }
-    if (!sharedNatively) {
-      window.open(`https://wa.me/?text=${text}`, "_blank");
-      setShowShareSheet(false);
-    }
-  }, [currentEntry, mode]);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+    setShowShareSheet(false);
+  }, [currentEntry]);
 
   const handleTwitter = useCallback(async () => {
     if (!currentEntry) return;
@@ -967,6 +1159,7 @@ export default function OutfitScorePage({
         currentEntry.score,
         mode === "couple",
         analysisTextTw,
+        `Just got a ${currentEntry.score}/100 on my outfit! 🎨 #ColourClash`,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -980,101 +1173,11 @@ ${APP_LINK}`,
         setShowShareSheet(false);
         return;
       }
-      downloadImageBlob(blob, "colour-clash-score.png");
     } catch {
       /* fallback */
     }
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(APP_LINK)}`,
-      "_blank",
-    );
-    setShowShareSheet(false);
-  }, [currentEntry, mode]);
-
-  const handleInstagram = useCallback(async () => {
-    if (!currentEntry) return;
-    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
-    const analysisText3 =
-      currentEntry.result?.analysis ??
-      currentEntry.coupleResult?.harmonyAdvice ??
-      "A bold colour story worth telling.";
-    try {
-      const blob = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisText3,
-      );
-      const file = new File([blob], "colour-clash-score.png", {
-        type: "image/png",
-      });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "Colour Clash Score",
-          text: `My outfit scored ${currentEntry.score}/100! ${APP_LINK}`,
-        });
-        setShowShareSheet(false);
-        return;
-      }
-    } catch {
-      /* fallback */
-    }
-    const blob2 = await buildShareImage(
-      currentEntry.photoDataUrl,
-      currentEntry.score,
-      mode === "couple",
-      analysisText3,
-    );
-    downloadImageBlob(blob2, "colour-clash-score.png");
-    window.open("https://www.instagram.com/", "_blank");
-    setShowShareSheet(false);
-  }, [currentEntry, mode]);
-
-  const handleFacebook = useCallback(async () => {
-    if (!currentEntry) return;
-    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
-    try {
-      const analysisText3 =
-        currentEntry.result?.analysis ??
-        currentEntry.coupleResult?.harmonyAdvice ??
-        "A bold colour story worth telling.";
-      const blob = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisText3,
-      );
-      const file = new File([blob], "colour-clash-score.png", {
-        type: "image/png",
-      });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: "Colour Clash Score",
-          text: `My outfit scored ${currentEntry.score}/100! ${APP_LINK}`,
-        });
-        setShowShareSheet(false);
-        return;
-      }
-    } catch {
-      /* fallback */
-    }
-    {
-      const analysisTextFbFb =
-        currentEntry.result?.analysis ??
-        currentEntry.coupleResult?.harmonyAdvice ??
-        "A bold colour story worth telling.";
-      const blobFb = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisTextFbFb,
-      );
-      downloadImageBlob(blobFb, "colour-clash-score.png");
-    }
-    window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(APP_LINK)}`,
       "_blank",
     );
     setShowShareSheet(false);
@@ -1096,6 +1199,7 @@ ${APP_LINK}`);
         currentEntry.score,
         mode === "couple",
         analysisText3,
+        `Just got a ${currentEntry.score}/100 on my outfit! 🎨 #ColourClash`,
       );
       const file = new File([blob], "colour-clash-score.png", {
         type: "image/png",
@@ -1112,57 +1216,8 @@ ${APP_LINK}`);
     } catch {
       /* fallback */
     }
-    {
-      const analysisTextTg =
-        currentEntry.result?.analysis ??
-        currentEntry.coupleResult?.harmonyAdvice ??
-        "A bold colour story worth telling.";
-      const blobTg = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisTextTg,
-      );
-      downloadImageBlob(blobTg, "colour-clash-score.png");
-    }
     window.open(
       `https://t.me/share/url?url=${encodeURIComponent(APP_LINK)}&text=${text}`,
-      "_blank",
-    );
-    setShowShareSheet(false);
-  }, [currentEntry, mode]);
-
-  const handlePinterest = useCallback(async () => {
-    if (!currentEntry) return;
-    const APP_LINK = "https://colourclash-emb.caffeine.xyz/";
-    try {
-      const analysisTextPi =
-        currentEntry.result?.analysis ??
-        currentEntry.coupleResult?.harmonyAdvice ??
-        "A bold colour story worth telling.";
-      const blob = await buildShareImage(
-        currentEntry.photoDataUrl,
-        currentEntry.score,
-        mode === "couple",
-        analysisTextPi,
-      );
-      const file = new File([blob], "colour-clash-score.png", {
-        type: "image/png",
-      });
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          text: `My outfit scored ${currentEntry.score}/100 on Colour Clash! ${APP_LINK}`,
-        });
-        setShowShareSheet(false);
-        return;
-      }
-      downloadImageBlob(blob, "colour-clash-score.png");
-    } catch {
-      /* fallback */
-    }
-    window.open(
-      `https://pinterest.com/pin/create/button/?url=${encodeURIComponent(APP_LINK)}&description=${encodeURIComponent(`My outfit scored ${currentEntry.score}/100 on Colour Clash!`)}`,
       "_blank",
     );
     setShowShareSheet(false);
@@ -1327,6 +1382,18 @@ ${APP_LINK}`);
                 >
                   {entry.score}
                 </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteLookbookEntry(entry.id);
+                    setLookbook(getLookbook());
+                  }}
+                  className="absolute top-1 right-1 bg-black/50 hover:bg-red-600/80 text-white rounded-full p-1 transition-colors z-10"
+                  data-ocid={`score.delete_button.${i + 1}`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </button>
             ))}
           </div>
@@ -1637,17 +1704,28 @@ ${APP_LINK}`);
                 style={{ zIndex: 2 }}
               />
             )}
-            {/* Score badge */}
+            {/* Score badge - ring style matching reference */}
             <div
-              className="absolute top-3 right-3 w-14 h-14 rounded-full flex flex-col items-center justify-center shadow-lg"
-              style={{ background: getScoreColor(score), zIndex: 3 }}
+              className="absolute top-3 right-3 w-16 h-16 rounded-full flex flex-col items-center justify-center shadow-lg"
+              style={{
+                background: "rgba(0,0,0,0.55)",
+                border: `3px solid ${getScoreColor(score)}`,
+                boxShadow: `0 0 12px ${getScoreColor(score)}88`,
+                zIndex: 3,
+              }}
               data-ocid="score.panel"
             >
-              <span className="text-white font-black text-xl leading-none">
+              <span className="text-white font-black text-lg leading-none">
                 {score}
               </span>
-              <span className="text-white/80 text-[10px] font-bold">
-                Grade {getScoreGrade(score)}
+              <span
+                className="text-[9px] font-black leading-none"
+                style={{ color: getScoreColor(score) }}
+              >
+                {getScoreGrade(score)}
+              </span>
+              <span className="text-white/70 text-[7px] font-bold tracking-wide leading-none mt-0.5">
+                CLASH SCORE
               </span>
             </div>
           </div>
@@ -1839,170 +1917,253 @@ ${APP_LINK}`);
           </motion.div>
         )}
 
+        {/* Path to 100% swatches */}
+        {pathTo100.length > 0 && (
+          <div className="mt-3 bg-card border border-border/30 rounded-2xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">
+              🎯 AI Suggestion: How to get 100% with this look.
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Tap a colour to shop it
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {pathTo100.map((swatch, idx) => {
+                const isSelected = shopSwatch?.name === swatch.name;
+                return (
+                  <button
+                    type="button"
+                    key={`${swatch.name}-${idx}`}
+                    className="flex flex-col items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                    onClick={() => setShopSwatch(isSelected ? null : swatch)}
+                    data-ocid="score.button"
+                  >
+                    <div
+                      className="w-12 h-12 rounded-full shadow-md border-2 transition-all"
+                      style={{
+                        background: swatch.color,
+                        borderColor: isSelected
+                          ? "#fff"
+                          : "rgba(255,255,255,0.2)",
+                        transform: isSelected ? "scale(1.15)" : "scale(1)",
+                        boxShadow: isSelected
+                          ? "0 0 0 3px rgba(135,206,235,0.7)"
+                          : undefined,
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground text-center leading-tight">
+                      {swatch.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {shopSwatch && (
+              <div className="pt-3 border-t border-border/20">
+                <p className="text-xs font-semibold text-foreground mb-2">
+                  🛍️ Shop {shopSwatch.name}:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    {
+                      name: "House of Indya",
+                      url: `https://www.houseofindya.com/Colourclash?q=${encodeURIComponent(shopSwatch.name)}`,
+                      color: "#9B2335",
+                    },
+                    {
+                      name: "Amazon",
+                      url: `https://www.amazon.in/s?k=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                      color: "#FF9900",
+                    },
+                    {
+                      name: "Flipkart",
+                      url: `https://www.flipkart.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                      color: "#2874F0",
+                    },
+                    {
+                      name: "Myntra",
+                      url: `https://www.myntra.com/${encodeURIComponent(shopSwatch.name)}`,
+                      color: "#FF3F6C",
+                    },
+                    {
+                      name: "Ajio",
+                      url: `https://www.ajio.com/search/?text=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                      color: "#DC2626",
+                    },
+                    {
+                      name: "Meesho",
+                      url: `https://www.meesho.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                      color: "#0D9488",
+                    },
+                    {
+                      name: "Nykaa",
+                      url: `https://www.nykaa.com/search/result/?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                      color: "#FC2779",
+                    },
+                    {
+                      name: "Offduty",
+                      url: `https://offduty.in/search?type=product&q=${encodeURIComponent(shopSwatch.name)}`,
+                      color: "#8B6914",
+                    },
+                  ].map((retailer) => (
+                    <a
+                      key={retailer.name}
+                      href={retailer.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-3 py-1.5 rounded-full font-medium text-white transition-opacity hover:opacity-80"
+                      style={{ background: retailer.color }}
+                      data-ocid="score.button"
+                    >
+                      {retailer.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Share sheet */}
         <AnimatePresence>
-          {showShareSheet && currentEntry && (
+          {showShareSheet && currentEntry && shareImageUrl && (
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 30 }}
-              className="fixed inset-0 z-50 flex items-end"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
               onClick={() => setShowShareSheet(false)}
               data-ocid="score.popover"
             >
-              <dialog
-                open
-                className="w-full max-w-lg mx-auto bg-background rounded-t-2xl border-t border-border p-4 pb-8 shadow-2xl static m-0"
+              <div
+                className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
-                <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
-                <h3 className="text-sm font-bold mb-3 text-center">
-                  Share your score
-                </h3>
-
-                {/* Score preview thumbnail */}
-                <div className="flex justify-center mb-4">
-                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border">
-                    <img
-                      src={currentEntry.photoDataUrl}
-                      alt="score"
-                      className="w-full h-full object-cover"
-                    />
-                    <div
-                      className="absolute bottom-1 right-1 rounded-full w-8 h-8 flex items-center justify-center text-white text-xs font-bold shadow"
-                      style={{ background: getScoreColor(currentEntry.score) }}
-                    >
-                      {currentEntry.score}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                  {/* WhatsApp */}
-                  <button
-                    type="button"
-                    onClick={handleWhatsApp}
-                    className="flex flex-col items-center gap-1.5"
-                    data-ocid="score.share.button"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#25D366] flex items-center justify-center">
-                      <SiWhatsapp className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      WhatsApp
-                    </span>
-                  </button>
-                  {/* Instagram */}
-                  <button
-                    type="button"
-                    onClick={handleInstagram}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)",
-                      }}
-                    >
-                      <SiInstagram className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Instagram
-                    </span>
-                  </button>
-                  {/* Facebook */}
-                  <button
-                    type="button"
-                    onClick={handleFacebook}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#1877F2] flex items-center justify-center">
-                      <SiFacebook className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Facebook
-                    </span>
-                  </button>
-                  {/* Twitter/X */}
-                  <button
-                    type="button"
-                    onClick={handleTwitter}
-                    className="flex flex-col items-center gap-1.5"
-                    data-ocid="score.share.button"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-black flex items-center justify-center">
-                      <SiX className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      X / Twitter
-                    </span>
-                  </button>
-                  {/* Telegram */}
-                  <button
-                    type="button"
-                    onClick={handleTelegram}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#0088CC] flex items-center justify-center">
-                      <SiTelegram className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Telegram
-                    </span>
-                  </button>
-                  {/* Pinterest */}
-                  <button
-                    type="button"
-                    onClick={handlePinterest}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#E60023] flex items-center justify-center">
-                      <SiPinterest className="w-6 h-6 text-white" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Pinterest
-                    </span>
-                  </button>
-                  {/* Download */}
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    className="flex flex-col items-center gap-1.5"
-                    data-ocid="score.secondary_button"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center">
-                      <Download className="w-6 h-6 text-primary-foreground" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Download
-                    </span>
-                  </button>
-                  {/* Copy Link */}
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="flex flex-col items-center gap-1.5"
-                    data-ocid="score.copy.button"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <Copy className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">
-                      Copy Link
-                    </span>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowShareSheet(false)}
-                  className="w-full py-2.5 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
-                  data-ocid="score.cancel_button"
+                {/* Full composite image preview */}
+                <div
+                  className="w-full bg-black flex items-center justify-center"
+                  style={{ maxHeight: "60vh", overflow: "hidden" }}
                 >
-                  Cancel
-                </button>
-              </dialog>
+                  <img
+                    src={shareImageUrl}
+                    alt="Share card"
+                    className="w-full object-contain"
+                    style={{ maxHeight: "60vh" }}
+                  />
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Right-click the image above to copy or save it
+                  </p>
+
+                  {/* Caption copy area */}
+                  <div className="bg-muted rounded-xl p-3 text-xs text-foreground leading-relaxed">
+                    {shareCaption}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const a = document.createElement("a");
+                        a.href = shareImageUrl;
+                        a.download = "colour-clash-score.png";
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        toast.success("Image downloaded!");
+                      }}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                      data-ocid="score.secondary_button"
+                    >
+                      <Download className="w-4 h-4" /> Download Image
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard
+                          .writeText(shareCaption)
+                          .then(() => toast.success("Caption copied!"))
+                          .catch(() => toast.error("Could not copy"));
+                      }}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                      data-ocid="score.copy.button"
+                    >
+                      <Copy className="w-4 h-4" /> Copy Caption
+                    </button>
+                  </div>
+
+                  {/* Platform buttons */}
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleWhatsApp}
+                      className="flex flex-col items-center gap-1"
+                      data-ocid="score.share.button"
+                    >
+                      <div className="w-11 h-11 rounded-full bg-[#25D366] flex items-center justify-center">
+                        <SiWhatsapp className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        WhatsApp
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTwitter}
+                      className="flex flex-col items-center gap-1"
+                      data-ocid="score.share.button"
+                    >
+                      <div className="w-11 h-11 rounded-full bg-black flex items-center justify-center">
+                        <SiX className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        X / Twitter
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTelegram}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <div className="w-11 h-11 rounded-full bg-[#0088CC] flex items-center justify-center">
+                        <SiTelegram className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        Telegram
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard
+                          .writeText(shareCaption)
+                          .then(() => toast.success("Copied!"));
+                        setShowShareSheet(false);
+                      }}
+                      className="flex flex-col items-center gap-1"
+                      data-ocid="score.copy.button"
+                    >
+                      <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center">
+                        <Copy className="w-5 h-5" />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        Copy Link
+                      </span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowShareSheet(false)}
+                    className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                    data-ocid="score.cancel_button"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

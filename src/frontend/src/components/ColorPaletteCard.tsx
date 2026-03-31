@@ -52,6 +52,199 @@ function CategoryIcon({ category }: { category: string }) {
       </svg>
     );
   }
+  if (cat.includes("skirt")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M30 20 L70 20 L85 82 L15 82Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <line x1="30" y1="20" x2="70" y2="20" stroke="white" strokeWidth="3" />
+      </svg>
+    );
+  }
+  if (cat.includes("turban")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M50 15 C30 15 15 30 15 45 C15 58 28 70 50 70 C72 70 85 58 85 45 C85 30 70 15 50 15Z"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+        <path
+          d="M15 45 Q20 35 50 38 Q80 35 85 45"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <circle
+          cx="50"
+          cy="25"
+          r="5"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (cat.includes("stole")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M20 15 C20 15 30 35 50 40 C70 45 80 65 80 65"
+          stroke="white"
+          strokeWidth="4"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M30 15 C30 15 38 30 50 35 C62 40 72 55 80 70"
+          stroke="white"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeDasharray="4 3"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (cat.includes("suit") || cat.includes("blazer")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M35 12 L15 30 L28 34 L28 85 L72 85 L72 34 L85 30 L65 12"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M35 12 L42 30 L50 28 L58 30 L65 12"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <line
+          x1="50"
+          y1="30"
+          x2="50"
+          y2="60"
+          stroke="white"
+          strokeWidth="1.5"
+          strokeDasharray="3 3"
+        />
+        <circle
+          cx="50"
+          cy="55"
+          r="3"
+          stroke="white"
+          strokeWidth="2"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (cat.includes("hoodie")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M35 15 C35 15 42 12 50 12 C58 12 65 15 65 15 L82 35 L70 38 L70 85 L30 85 L30 38 L18 35Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M40 12 C40 22 42 26 50 28 C58 26 60 22 60 12"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (cat.includes("shorts")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M20 20 L80 20 L70 65 L60 55 L50 60 L40 55 L30 65Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <line x1="50" y1="20" x2="50" y2="60" stroke="white" strokeWidth="3" />
+      </svg>
+    );
+  }
+  if (cat.includes("jeans")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M20 15 L80 15 L72 55 L62 90 L50 72 L38 90 L28 55Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <line x1="50" y1="15" x2="50" y2="72" stroke="white" strokeWidth="3" />
+        <path
+          d="M30 24 Q35 28 42 26"
+          stroke="white"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </svg>
+    );
+  }
   if (
     cat.includes("shoe") ||
     cat.includes("footwear") ||

@@ -575,6 +575,36 @@ export default function ProfilePage({
           >
             <Download className="w-3.5 h-3.5" /> Save App Logo PNG
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                const res = await fetch(
+                  "/assets/generated/colour-clash-icon-4dots.dim_400x400-transparent.png",
+                );
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "colour-clash-branding-icon.png";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast.success("Branding icon saved!");
+              } catch {
+                window.open(
+                  "/assets/generated/colour-clash-icon-4dots.dim_400x400-transparent.png",
+                  "_blank",
+                );
+                toast.info("Long-press the image to save on mobile.");
+              }
+            }}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-lg border border-border hover:border-primary/40"
+            data-ocid="profile.secondary_button"
+          >
+            <Download className="w-3.5 h-3.5" /> Download Colour Clash Branding
+          </button>
           <p className="text-[10px] text-muted-foreground">
             On mobile: long-press the logo above to save
           </p>

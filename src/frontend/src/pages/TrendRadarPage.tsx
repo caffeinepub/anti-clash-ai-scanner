@@ -4,6 +4,7 @@ import { Loader2, RefreshCw, TrendingUp } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useFilters } from "../context/FilterContext";
 
 const GEMINI_API_KEY = "AIzaSyD3pY6TmTNA17OCAghZJrPfn7zxPYd7cF0";
 const CACHE_KEY = "trendRadar";
@@ -106,9 +107,60 @@ function loadCache(): Trend[] | null {
   }
 }
 
+const RETAILER_FILTER = [
+  {
+    key: "all",
+    label: "All",
+    url: (q: string) => `https://www.amazon.in/s?k=${q}`,
+  },
+  {
+    key: "indya",
+    label: "House of Indya",
+    url: (q: string) =>
+      `https://www.houseofindya.com/catalogsearch/result?q=${q}`,
+  },
+  {
+    key: "amazon",
+    label: "Amazon",
+    url: (q: string) => `https://www.amazon.in/s?k=${q}`,
+  },
+  {
+    key: "flipkart",
+    label: "Flipkart",
+    url: (q: string) => `https://www.flipkart.com/search?q=${q}`,
+  },
+  {
+    key: "myntra",
+    label: "Myntra",
+    url: (q: string) => `https://www.myntra.com/${q}`,
+  },
+  {
+    key: "ajio",
+    label: "Ajio",
+    url: (q: string) => `https://www.ajio.com/search/?text=${q}`,
+  },
+  {
+    key: "meesho",
+    label: "Meesho",
+    url: (q: string) => `https://www.meesho.com/search?q=${q}`,
+  },
+  {
+    key: "nykaa",
+    label: "Nykaa",
+    url: (q: string) => `https://www.nykaa.com/search/result/?q=${q}`,
+  },
+  {
+    key: "offduty",
+    label: "Offduty",
+    url: (q: string) => `https://offduty.in/search?q=${q}`,
+  },
+];
+
 export default function TrendRadarPage() {
+  const { gender } = useFilters();
   const [trends, setTrends] = useState<Trend[]>(() => loadCache() ?? []);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRetailer, setSelectedRetailer] = useState("all");
   const hasFetched = useRef(false);
 
   const fetchTrends = async (force = false) => {
@@ -121,8 +173,8 @@ export default function TrendRadarPage() {
     }
     setIsLoading(true);
     try {
-      const prompt =
-        'List the top 10 trending outfit color combinations for 2026 fashion. Return ONLY valid JSON: {"trends": [{"name": "Trend Name", "colors": ["#hex1", "#hex2"], "description": "1 sentence tip", "garments": "e.g. blazer + trousers"}]}';
+      const genderCtx = gender === "male" ? "men's fashion" : "women's fashion";
+      const prompt = `List the top 10 trending outfit color combinations for 2026 ${genderCtx}. Return ONLY valid JSON: {"trends": [{"name": "Trend Name", "colors": ["#hex1", "#hex2"], "description": "1 sentence tip", "garments": "e.g. blazer + trousers"}]}`;
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -162,21 +214,31 @@ export default function TrendRadarPage() {
     }
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount, re-run on gender change
   useEffect(() => {
     if (!hasFetched.current) {
       hasFetched.current = true;
-      if (trends.length === 0) {
-        fetchTrends();
-      }
+      fetchTrends();
     }
   }, []);
+
+  // Re-fetch when gender changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional
+  useEffect(() => {
+    if (hasFetched.current) {
+      localStorage.removeItem(CACHE_KEY);
+      fetchTrends(true);
+    }
+  }, [gender]);
 
   const buildShopUrl = (trend: Trend) => {
     const query = encodeURIComponent(
       `${trend.name} ${trend.garments} fashion 2026`,
     );
-    return `https://www.amazon.in/s?k=${query}`;
+    const retailer =
+      RETAILER_FILTER.find((r) => r.key === selectedRetailer) ??
+      RETAILER_FILTER[0];
+    return retailer.url(query);
   };
 
   return (
@@ -215,6 +277,37 @@ export default function TrendRadarPage() {
           <p className="text-sm text-muted-foreground">Analysing with AI...</p>
         </div>
       )}
+
+      {/* Retailer filter chips */}
+      <div
+        className="flex gap-2 overflow-x-auto pb-1"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {RETAILER_FILTER.map((r) => (
+          <button
+            key={r.key}
+            type="button"
+            onClick={() => setSelectedRetailer(r.key)}
+            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition-all border ${
+              selectedRetailer === r.key
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted text-muted-foreground border-border hover:border-primary/40"
+            }`}
+            data-ocid="trends.tab"
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Gender context note */}
+      <p className="text-[11px] text-muted-foreground -mt-2">
+        Showing trends for{" "}
+        <span className="font-semibold text-foreground capitalize">
+          {gender === "male" ? "Men" : "Women"}
+        </span>{" "}
+        · Change in Home Filters
+      </p>
 
       {!isLoading && trends.length === 0 && (
         <div

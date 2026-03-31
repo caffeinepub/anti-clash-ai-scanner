@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import ColourClashLogo from "./components/ColourClashLogo";
 import GreetingOverlay from "./components/GreetingOverlay";
 import NetflixIntro from "./components/NetflixIntro";
+import { FilterProvider } from "./context/FilterContext";
 import {
   UserProfileProvider,
   useUserProfile,
@@ -639,8 +640,10 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <InternetIdentityProvider>
         <UserProfileProvider>
-          <AppContent />
-          <Toaster />
+          <FilterProvider>
+            <AppContent />
+            <Toaster />
+          </FilterProvider>
         </UserProfileProvider>
       </InternetIdentityProvider>
     </QueryClientProvider>

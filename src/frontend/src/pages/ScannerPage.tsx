@@ -19,8 +19,10 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { HarmonyPalette } from "../backend.d";
+import { useFilters } from "../context/FilterContext";
 import { useUserProfile } from "../context/UserProfileContext";
 import { useAddFavorite, useGetHarmonyAdvice } from "../hooks/useQueries";
+import { getColorName } from "../lib/colorNames";
 import {
   generateMatchingColors,
   getColorFamily,
@@ -29,7 +31,6 @@ import {
   sampleVideoColor,
 } from "../utils/colorUtils";
 
-import { generateGarmentImage } from "../utils/geminiAI";
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
   { label: "Top / Shirt", emoji: "👕" },
@@ -42,6 +43,15 @@ const GARMENT_TYPES = [
   { label: "Saree / Ethnic Wear", emoji: "🥻" },
   { label: "Kurta / Kurti", emoji: "🩱" },
   { label: "Scarf / Dupatta", emoji: "🧣" },
+  { label: "Skirt", emoji: "👗" },
+  { label: "Turban", emoji: "🎩" },
+  { label: "Stole", emoji: "🧣" },
+  { label: "Ethnic Wear", emoji: "🥻" },
+  { label: "Suit / Blazer", emoji: "🤵" },
+  { label: "Hoodie", emoji: "🧥" },
+  { label: "Shorts", emoji: "🩳" },
+  { label: "Jeans", emoji: "👖" },
+  { label: "Sneakers", emoji: "👟" },
 ];
 
 const GARMENT_KEYWORD_MAP: Record<string, string> = {
@@ -55,6 +65,15 @@ const GARMENT_KEYWORD_MAP: Record<string, string> = {
   "Saree / Ethnic Wear": "saree",
   "Kurta / Kurti": "kurta",
   "Scarf / Dupatta": "dupatta",
+  Skirt: "skirt",
+  Turban: "turban",
+  Stole: "stole",
+  "Ethnic Wear": "ethnic wear",
+  "Suit / Blazer": "blazer",
+  Hoodie: "hoodie",
+  Shorts: "shorts",
+  Jeans: "jeans",
+  Sneakers: "sneakers",
 };
 
 const COMPLEMENTARY_GARMENT_MAP: Record<string, string[]> = {
@@ -637,88 +656,340 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 }
 
 // ── Product Card ──────────────────────────────────────────────────────────
-// ── GarmentImageCard ──────────────────────────────────────────────────────
-interface GarmentImageCardProps {
+// ── PaletteIconCard ──────────────────────────────────────────────────────
+interface PaletteIconCardProps {
   garmentType: string;
   hexColor: string;
 }
 
-function GarmentImageCard({ garmentType, hexColor }: GarmentImageCardProps) {
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setImgSrc(null);
-    setLoading(true);
-    generateGarmentImage(garmentType, hexColor).then((src) => {
-      if (!cancelled) {
-        setImgSrc(src);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [garmentType, hexColor]);
-
-  const emoji =
-    garmentType.toLowerCase().includes("shirt") ||
-    garmentType.toLowerCase().includes("top")
-      ? "👕"
-      : garmentType.toLowerCase().includes("pant") ||
-          garmentType.toLowerCase().includes("bottom") ||
-          garmentType.toLowerCase().includes("trouser")
-        ? "👖"
-        : garmentType.toLowerCase().includes("shoe") ||
-            garmentType.toLowerCase().includes("footwear") ||
-            garmentType.toLowerCase().includes("heel") ||
-            garmentType.toLowerCase().includes("sneaker")
-          ? "👟"
-          : garmentType.toLowerCase().includes("jacket") ||
-              garmentType.toLowerCase().includes("coat")
-            ? "🧥"
-            : garmentType.toLowerCase().includes("bag") ||
-                garmentType.toLowerCase().includes("purse")
-              ? "👜"
-              : garmentType.toLowerCase().includes("watch") ||
-                  garmentType.toLowerCase().includes("accessory")
-                ? "⌚"
-                : garmentType.toLowerCase().includes("saree") ||
-                    garmentType.toLowerCase().includes("kurta")
-                  ? "👗"
-                  : "👗";
-
-  if (loading) {
+function PaletteIconIcon({ cat }: { cat: string }) {
+  const style: React.CSSProperties = {
+    width: "60%",
+    height: "60%",
+    opacity: 0.9,
+  };
+  if (
+    cat.includes("top") ||
+    cat.includes("shirt") ||
+    cat.includes("tee") ||
+    cat.includes("blouse")
+  ) {
     return (
-      <div
-        className="w-full h-full flex items-center justify-center"
-        style={{ background: `${hexColor}33` }}
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
       >
-        <div
-          className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin"
-          style={{ color: hexColor }}
+        <path
+          d="M30 15 L15 35 L28 38 L28 82 L72 82 L72 38 L85 35 L70 15 C65 22 58 25 50 25 C42 25 35 22 30 15Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
         />
-      </div>
+      </svg>
     );
   }
-
-  if (imgSrc) {
+  if (
+    cat.includes("bottom") ||
+    cat.includes("pant") ||
+    cat.includes("trouser") ||
+    cat.includes("jean")
+  ) {
     return (
-      <img
-        src={imgSrc}
-        alt={garmentType}
-        className="w-full h-full object-cover"
-      />
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M20 20 L80 20 L72 55 L62 85 L50 70 L38 85 L28 55Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <line x1="50" y1="20" x2="50" y2="70" stroke="white" strokeWidth="3" />
+      </svg>
     );
   }
+  if (cat.includes("skirt")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M30 20 L70 20 L85 82 L15 82Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (
+    cat.includes("shoe") ||
+    cat.includes("footwear") ||
+    cat.includes("sneaker") ||
+    cat.includes("heel") ||
+    cat.includes("sandal")
+  ) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M15 65 C15 65 20 40 35 38 L55 38 C65 38 80 45 85 60 L85 70 C85 75 80 78 75 78 L20 78 C16 78 13 74 15 65Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M35 38 L35 28 C35 24 38 20 42 20 L50 20"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (
+    cat.includes("bag") ||
+    cat.includes("purse") ||
+    cat.includes("handbag") ||
+    cat.includes("clutch")
+  ) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <rect
+          x="20"
+          y="38"
+          width="60"
+          height="48"
+          rx="6"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+        <path
+          d="M35 38 C35 28 40 20 50 20 C60 20 65 28 65 38"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (
+    cat.includes("jacket") ||
+    cat.includes("coat") ||
+    cat.includes("blazer") ||
+    cat.includes("suit")
+  ) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M35 12 L15 30 L28 34 L28 85 L72 85 L72 34 L85 30 L65 12"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M35 12 L42 30 L50 28 L58 30 L65 12"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <line
+          x1="50"
+          y1="30"
+          x2="50"
+          y2="60"
+          stroke="white"
+          strokeWidth="1.5"
+          strokeDasharray="3 3"
+        />
+      </svg>
+    );
+  }
+  if (
+    cat.includes("saree") ||
+    cat.includes("sari") ||
+    cat.includes("ethnic") ||
+    cat.includes("kurta") ||
+    cat.includes("dupatta") ||
+    cat.includes("stole") ||
+    cat.includes("scarf")
+  ) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M50 10 C50 10 42 18 38 28 L35 85 L50 75 L65 85 L62 28 C58 18 50 10 50 10Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M38 28 C38 28 28 32 20 55 L35 85"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <path
+          d="M62 28 C62 28 72 32 80 55 L65 85"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+        <line x1="38" y1="42" x2="62" y2="42" stroke="white" strokeWidth="2" />
+      </svg>
+    );
+  }
+  if (
+    cat.includes("access") ||
+    cat.includes("watch") ||
+    cat.includes("jewel") ||
+    cat.includes("necklace") ||
+    cat.includes("ring")
+  ) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <rect
+          x="8"
+          y="38"
+          width="35"
+          height="24"
+          rx="10"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+        <rect
+          x="57"
+          y="38"
+          width="35"
+          height="24"
+          rx="10"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+        <line x1="43" y1="50" x2="57" y2="50" stroke="white" strokeWidth="3" />
+      </svg>
+    );
+  }
+  if (cat.includes("dress")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M38 12 L28 30 L18 82 L82 82 L72 30 L62 12 C58 18 52 20 50 20 C48 20 42 18 38 12Z"
+          stroke="white"
+          strokeWidth="3"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  if (cat.includes("turban")) {
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        style={style}
+        aria-hidden="true"
+      >
+        <path
+          d="M50 15 C30 15 15 30 15 45 C15 58 28 70 50 70 C72 70 85 58 85 45 C85 30 70 15 50 15Z"
+          stroke="white"
+          strokeWidth="3"
+          fill="none"
+        />
+        <path
+          d="M15 45 Q20 35 50 38 Q80 35 85 45"
+          stroke="white"
+          strokeWidth="2.5"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+  // Default: generic garment
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={style}
+      aria-hidden="true"
+    >
+      <path
+        d="M30 15 L15 35 L28 38 L28 82 L72 82 L72 38 L85 35 L70 15 C65 22 58 25 50 25 C42 25 35 22 30 15Z"
+        stroke="white"
+        strokeWidth="3"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
 
+function PaletteIconCard({ garmentType, hexColor }: PaletteIconCardProps) {
+  const cat = garmentType.toLowerCase();
   return (
     <div
       className="w-full h-full flex items-center justify-center"
-      style={{ background: `${hexColor}33` }}
+      style={{ background: hexColor }}
     >
-      <span style={{ fontSize: "2.5rem" }}>{emoji}</span>
+      <PaletteIconIcon cat={cat} />
     </div>
   );
 }
@@ -754,7 +1025,7 @@ function ProductCard({
       data-ocid={`scanner.item.${index + 1}`}
     >
       <div className="relative" style={{ aspectRatio: "4/5" }}>
-        <GarmentImageCard
+        <PaletteIconCard
           garmentType={product.garmentLabel}
           hexColor={colorHex}
         />
@@ -1041,7 +1312,7 @@ function ShopMatchingStyles({
                               className="relative"
                               style={{ aspectRatio: "4/5" }}
                             >
-                              <GarmentImageCard
+                              <PaletteIconCard
                                 garmentType={product.garmentLabel}
                                 hexColor={shopColor.hex}
                               />
@@ -1107,9 +1378,16 @@ function OutfitCard({ outfit, index, gender: _gender }: OutfitCardProps) {
   ];
 
   const handleSave = () => {
-    toast.success(`"${outfit.title}" saved to favourites!`, {
-      icon: "❤️",
-    });
+    const key = "cc_saved_looks";
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const entry = {
+      ...outfit,
+      id: Date.now(),
+      savedAt: new Date().toISOString(),
+    };
+    existing.unshift(entry);
+    localStorage.setItem(key, JSON.stringify(existing.slice(0, 50)));
+    toast.success(`"${outfit.title}" saved to Favourites!`, { icon: "❤️" });
   };
 
   const handleShare = async () => {
@@ -1485,6 +1763,10 @@ function getAgeProfile(age: AgeCategory) {
           "Bottom / Pants",
           "Shoes / Footwear",
           "Bag / Purse",
+          "Hoodie",
+          "Shorts",
+          "Jeans",
+          "Sneakers",
         ],
         sizeHint: "XS/S",
         excludeCategories: ["formal", "ethnic-adult", "saree"],
@@ -1498,6 +1780,11 @@ function getAgeProfile(age: AgeCategory) {
           "Shoes / Footwear",
           "Watch / Accessory",
           "Bag / Purse",
+          "Hoodie",
+          "Shorts",
+          "Jeans",
+          "Sneakers",
+          "Dress",
         ],
         sizeHint: "S/M",
         excludeCategories: ["saree", "ethnic-adult"],
@@ -1522,6 +1809,10 @@ function getAgeProfile(age: AgeCategory) {
           "Kurta / Kurti",
           "Saree / Ethnic Wear",
           "Shoes / Footwear",
+          "Stole",
+          "Ethnic Wear",
+          "Suit / Blazer",
+          "Watch / Accessory",
         ],
         sizeHint: "L/XL/XXL",
         excludeCategories: ["streetwear", "crop", "mini"],
@@ -1564,17 +1855,19 @@ export default function ScannerPage() {
     name: string;
   } | null>(null);
   const [colorHistory, setColorHistory] = useState<string[]>([]);
-  const [selectedGender, setSelectedGender] = useState<"male" | "female">(
-    "male",
-  );
-  const [selectedAge, setSelectedAge] = useState<
-    "kid" | "teenage" | "young" | "adult" | "senior"
-  >("young");
+  const {
+    gender: selectedGender,
+    age: selectedAge,
+    size: selectedSize,
+    aiPlatform: selectedAI,
+    setGender: setSelectedGender,
+    setAge: setSelectedAge,
+    setSize: setSelectedSize,
+    setAiPlatform: setSelectedAI,
+  } = useFilters();
   const [selectedMood, _setSelectedMood] = useState<string>("casual");
   const [selectedOccasion, _setSelectedOccasion] = useState<string>("");
   const [filtersOpen, setFiltersOpen] = useState(true);
-  const [selectedAI, setSelectedAI] = useState<string>("");
-  const [selectedSize, setSelectedSize] = useState<string>("M");
   const [aiConnected, setAiConnected] = useState<boolean>(false);
 
   const detectedColorRef = useRef<string>("#808080");
@@ -1586,19 +1879,7 @@ export default function ScannerPage() {
   const ageProfile = getAgeProfile(selectedAge);
   const moodKeyword = getMoodKeyword(selectedMood, selectedOccasion);
 
-  // Auto-fill gender/age from profile
-  useEffect(() => {
-    if (userProfile?.gender === "men") setSelectedGender("male");
-    else if (userProfile?.gender === "women") setSelectedGender("female");
-    if (userProfile?.age) {
-      const age = Number(userProfile.age);
-      if (age < 13) setSelectedAge("kid");
-      else if (age < 18) setSelectedAge("teenage");
-      else if (age < 30) setSelectedAge("young");
-      else if (age < 60) setSelectedAge("adult");
-      else setSelectedAge("senior");
-    }
-  }, [userProfile?.gender, userProfile?.age]);
+  // Gender/age auto-filled by FilterContext from profile
 
   const {
     videoRef,
@@ -1616,7 +1897,7 @@ export default function ScannerPage() {
     useGetHarmonyAdvice(adviceHex);
 
   const activeColor = lockedColor ?? detectedColor;
-  const colorName = hexToColorName(activeColor);
+  const colorName = getColorName(activeColor);
   const _colorFamily = getColorFamily(activeColor);
   const advice = localAdvice ?? harmonyData;
   const garment = selectedGarment ?? detectGarmentFromHex(activeColor);
@@ -2263,20 +2544,29 @@ export default function ScannerPage() {
             <div className="p-3">
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
                 {GARMENT_TYPES.filter((gt) => {
-                  // Filter by gender
+                  // Phase 4: Demographic filtering by gender + age
+                  const ap = getAgeProfile(selectedAge);
+                  // Age-based filter (always apply)
+                  if (ap.allowedGarments.length < GARMENT_TYPES.length) {
+                    if (!ap.allowedGarments.includes(gt.label)) return false;
+                  }
+                  // Gender-based filter
                   if (selectedGender === "male") {
-                    const maleExclude = [
+                    const femaleOnly = [
                       "Dress",
                       "Saree / Ethnic Wear",
                       "Bag / Purse",
                       "Scarf / Dupatta",
+                      "Skirt",
+                      "Stole",
+                      "Dupatta",
                     ];
-                    if (maleExclude.includes(gt.label)) return false;
-                  }
-                  // Filter by age
-                  const ap = getAgeProfile(selectedAge);
-                  if (ap.allowedGarments.length < GARMENT_TYPES.length) {
-                    return ap.allowedGarments.includes(gt.label);
+                    if (femaleOnly.includes(gt.label)) return false;
+                  } else {
+                    // female
+                    const maleOnly = ["Turban", "Suit / Blazer"];
+                    if (maleOnly.includes(gt.label) && selectedAge !== "young")
+                      return false;
                   }
                   return true;
                 }).map((gt) => {

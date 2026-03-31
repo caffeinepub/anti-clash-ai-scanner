@@ -428,9 +428,170 @@ function SavedCard({
 }
 
 // ── Main component ────────────────────────────────────────────────────────
+
+// ── Saved Looks Tab ──────────────────────────────────────────────────────────
+interface SavedLook {
+  id: number;
+  savedAt: string;
+  title: string;
+  hairstyle: string;
+  top: { label: string; color: string; hex: string };
+  bottom: { label: string; color: string; hex: string };
+  shoes: { label: string; color: string; hex: string };
+  accessory: { label: string; color: string; hex: string };
+  bag?: { label: string; color: string; hex: string };
+}
+
+function SavedLooksTab() {
+  const [looks, setLooks] = useState<SavedLook[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("cc_saved_looks") || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  const handleDelete = (id: number) => {
+    const updated = looks.filter((l) => l.id !== id);
+    localStorage.setItem("cc_saved_looks", JSON.stringify(updated));
+    setLooks(updated);
+    toast.success("Look removed from Favourites");
+  };
+
+  if (looks.length === 0) {
+    return (
+      <div
+        className="text-center py-12"
+        style={{ color: "#9c7a58" }}
+        data-ocid="favorites.empty_state"
+      >
+        <p className="text-4xl mb-3">💅</p>
+        <p
+          className="text-sm"
+          style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}
+        >
+          No saved looks yet.
+        </p>
+        <p className="text-xs mt-1">
+          Scan a colour on the Home tab and save a complete look!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4" data-ocid="favorites.list">
+      {looks.map((look, index) => {
+        const items = [
+          {
+            emoji: "👕",
+            label: look.top.label,
+            color: look.top.color,
+            hex: look.top.hex,
+          },
+          {
+            emoji: "👖",
+            label: look.bottom.label,
+            color: look.bottom.color,
+            hex: look.bottom.hex,
+          },
+          {
+            emoji: "👟",
+            label: look.shoes.label,
+            color: look.shoes.color,
+            hex: look.shoes.hex,
+          },
+          {
+            emoji: "⌚",
+            label: look.accessory.label,
+            color: look.accessory.color,
+            hex: look.accessory.hex,
+          },
+          ...(look.bag
+            ? [
+                {
+                  emoji: "👜",
+                  label: look.bag.label,
+                  color: look.bag.color,
+                  hex: look.bag.hex,
+                },
+              ]
+            : []),
+        ];
+        return (
+          <motion.div
+            key={look.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ delay: index * 0.06 }}
+            style={{
+              ...notebook.card,
+              borderLeft: `4px solid ${notebook.accent}`,
+            }}
+            className="relative"
+            data-ocid={`favorites.item.${index + 1}`}
+          >
+            <button
+              type="button"
+              onClick={() => handleDelete(look.id)}
+              className="absolute top-2 right-2 p-1 rounded-full hover:bg-red-100"
+              aria-label="Delete look"
+              data-ocid={`favorites.delete_button.${index + 1}`}
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </button>
+            <p
+              className="font-bold text-sm mb-1"
+              style={{ color: notebook.accent }}
+            >
+              {look.title}
+            </p>
+            <p
+              className="text-xs mb-2"
+              style={{ color: "#9c7a58", fontStyle: "italic" }}
+            >
+              💇 {look.hairstyle}
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {items.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <span>{item.emoji}</span>
+                  <span style={{ color: "#9c7a58" }} className="flex-1">
+                    {item.label}
+                  </span>
+                  <span
+                    className="font-medium"
+                    style={{ color: notebook.accent }}
+                  >
+                    {item.color}
+                  </span>
+                  {item.hex && (
+                    <div
+                      className="w-4 h-4 rounded-full border border-white/30 flex-shrink-0"
+                      style={{ background: item.hex }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs mt-2" style={{ color: "#bca88a" }}>
+              Saved {new Date(look.savedAt).toLocaleDateString()}
+            </p>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function FavoritesPage(_props?: {
   onNavigate?: (tab: string) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"palettes" | "looks">("palettes");
   const { identity } = useInternetIdentity();
   const principalText = identity?.getPrincipal().isAnonymous()
     ? "anon"
@@ -1214,69 +1375,107 @@ export default function FavoritesPage(_props?: {
           })()}
         </div>
 
-        {/* ── Saved palettes ── */}
-        <div style={notebook.marginLine} className="mb-3">
-          <h2
-            className="text-base font-semibold"
-            style={{ ...notebook.heading, fontStyle: "normal" }}
-            data-ocid="favorites.list"
+        {/* ── Tab Toggle ── */}
+        <div className="flex gap-2 mb-4" style={notebook.marginLine}>
+          <button
+            type="button"
+            onClick={() => setActiveTab("palettes")}
+            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              background:
+                activeTab === "palettes" ? notebook.accent : "#f0e8d8",
+              color: activeTab === "palettes" ? "#fff" : notebook.accent,
+              border: `1.5px solid ${notebook.accent}`,
+            }}
+            data-ocid="favorites.tab"
           >
-            Saved Palettes
-            {mergedFavorites.length > 0 && (
-              <span
-                className="ml-2 text-xs"
-                style={{
-                  background: notebook.accent,
-                  color: "#fff",
-                  padding: "1px 7px",
-                  borderRadius: 99,
-                }}
-              >
-                {mergedFavorites.length}
-              </span>
-            )}
-          </h2>
+            🎨 Saved Palettes
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("looks")}
+            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              background: activeTab === "looks" ? notebook.accent : "#f0e8d8",
+              color: activeTab === "looks" ? "#fff" : notebook.accent,
+              border: `1.5px solid ${notebook.accent}`,
+            }}
+            data-ocid="favorites.tab"
+          >
+            💅 Saved Looks
+          </button>
         </div>
 
-        {isLoading ? (
-          <div
-            className="flex items-center justify-center py-10"
-            data-ocid="favorites.loading_state"
-          >
-            <Loader2
-              className="w-6 h-6 animate-spin"
-              style={{ color: notebook.accent }}
-            />
-          </div>
-        ) : mergedFavorites.length === 0 ? (
-          <div
-            className="text-center py-12"
-            style={{ color: "#9c7a58" }}
-            data-ocid="favorites.empty_state"
-          >
-            <p className="text-4xl mb-3">🎨</p>
-            <p
-              className="text-sm"
-              style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}
-            >
-              No saved palettes yet.
-            </p>
-            <p className="text-xs mt-1">Scan a colour above to get started.</p>
-          </div>
+        {activeTab === "looks" ? (
+          <SavedLooksTab />
         ) : (
-          <div className="flex flex-col gap-3">
-            <AnimatePresence>
-              {mergedFavorites.map((item, index) => (
-                <SavedCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  onDelete={handleDelete}
-                  isDeleting={deleteFavorite.isPending}
+          <>
+            <div style={notebook.marginLine} className="mb-3">
+              <h2
+                className="text-base font-semibold"
+                style={{ ...notebook.heading, fontStyle: "normal" }}
+                data-ocid="favorites.list"
+              >
+                Saved Palettes
+                {mergedFavorites.length > 0 && (
+                  <span
+                    className="ml-2 text-xs"
+                    style={{
+                      background: notebook.accent,
+                      color: "#fff",
+                      padding: "1px 7px",
+                      borderRadius: 99,
+                    }}
+                  >
+                    {mergedFavorites.length}
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {isLoading ? (
+              <div
+                className="flex items-center justify-center py-10"
+                data-ocid="favorites.loading_state"
+              >
+                <Loader2
+                  className="w-6 h-6 animate-spin"
+                  style={{ color: notebook.accent }}
                 />
-              ))}
-            </AnimatePresence>
-          </div>
+              </div>
+            ) : mergedFavorites.length === 0 ? (
+              <div
+                className="text-center py-12"
+                style={{ color: "#9c7a58" }}
+                data-ocid="favorites.empty_state"
+              >
+                <p className="text-4xl mb-3">🎨</p>
+                <p
+                  className="text-sm"
+                  style={{ fontFamily: "Georgia, serif", fontStyle: "italic" }}
+                >
+                  No saved palettes yet.
+                </p>
+                <p className="text-xs mt-1">
+                  Scan a colour above to get started.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <AnimatePresence>
+                  {mergedFavorites.map((item, index) => (
+                    <SavedCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      onDelete={handleDelete}
+                      isDeleting={deleteFavorite.isPending}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
