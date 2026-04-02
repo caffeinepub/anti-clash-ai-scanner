@@ -1447,6 +1447,459 @@ function StyleStreakBadge() {
   );
 }
 
+// ── Daily Style Challenge ─────────────────────────────────────────────────
+const DAILY_CHALLENGES = [
+  {
+    title: "Dusty Rose Day",
+    hex: "#DCAE96",
+    desc: "Build a head-to-toe look in dusty rose tones",
+    badge: "🌸",
+    gender: "female",
+  },
+  {
+    title: "Navy Commander",
+    hex: "#000080",
+    desc: "Command the room in sharp navy coordinates",
+    badge: "⚓",
+    gender: "male",
+  },
+  {
+    title: "Sage & Sand Edit",
+    hex: "#87AE73",
+    desc: "Pair sage green with sandy neutrals",
+    badge: "🌿",
+    gender: "all",
+  },
+  {
+    title: "Crimson Strike",
+    hex: "#DC143C",
+    desc: "Make a bold statement in crimson red",
+    badge: "🔴",
+    gender: "all",
+  },
+  {
+    title: "Ivory Elegance",
+    hex: "#FFFFF0",
+    desc: "Pure and polished — all ivory everything",
+    badge: "🤍",
+    gender: "all",
+  },
+  {
+    title: "Cobalt Power",
+    hex: "#0047AB",
+    desc: "Cobalt blue for a high-energy power look",
+    badge: "💙",
+    gender: "all",
+  },
+  {
+    title: "Terracotta Vibes",
+    hex: "#E2725B",
+    desc: "Earthy terracotta — warm and sun-kissed",
+    badge: "🏺",
+    gender: "all",
+  },
+  {
+    title: "Mustard Magic",
+    hex: "#FFDB58",
+    desc: "Golden mustard for a sunny, joyful outfit",
+    badge: "🌻",
+    gender: "all",
+  },
+  {
+    title: "Forest Escape",
+    hex: "#228B22",
+    desc: "Go deep forest green for a nature-inspired look",
+    badge: "🌲",
+    gender: "all",
+  },
+  {
+    title: "Lilac Dream",
+    hex: "#C8A2C8",
+    desc: "Soft lilac for a dreamy, romantic ensemble",
+    badge: "💜",
+    gender: "female",
+  },
+  {
+    title: "Charcoal Sharp",
+    hex: "#36454F",
+    desc: "Charcoal grey — sleek, sharp, unstoppable",
+    badge: "🖤",
+    gender: "male",
+  },
+  {
+    title: "Coral Sunset",
+    hex: "#FF7F50",
+    desc: "Warm coral for a sunset-ready outfit",
+    badge: "🌅",
+    gender: "all",
+  },
+  {
+    title: "Plum Royale",
+    hex: "#DDA0DD",
+    desc: "Rich plum tones for a regal look",
+    badge: "👑",
+    gender: "all",
+  },
+  {
+    title: "Caramel Luxe",
+    hex: "#C68642",
+    desc: "Warm caramel — luxurious and effortless",
+    badge: "☕",
+    gender: "all",
+  },
+  {
+    title: "Teal Confidence",
+    hex: "#008080",
+    desc: "Bold teal for a confident, standout look",
+    badge: "🦚",
+    gender: "all",
+  },
+  {
+    title: "Powder Blue Chill",
+    hex: "#B0C4DE",
+    desc: "Relaxed powder blue for casual cool vibes",
+    badge: "🩵",
+    gender: "all",
+  },
+  {
+    title: "Blush & Gold",
+    hex: "#FFB6C1",
+    desc: "Delicate blush with gold accessories",
+    badge: "✨",
+    gender: "female",
+  },
+  {
+    title: "Midnight Edit",
+    hex: "#191970",
+    desc: "All-midnight — mysterious and magnetic",
+    badge: "🌙",
+    gender: "all",
+  },
+  {
+    title: "Jade Fresh",
+    hex: "#00A86B",
+    desc: "Fresh jade green for a clean, modern look",
+    badge: "💚",
+    gender: "all",
+  },
+  {
+    title: "Berry Bold",
+    hex: "#8E2D56",
+    desc: "Deep berry — unapologetically bold",
+    badge: "🍇",
+    gender: "all",
+  },
+  {
+    title: "Warm Sand Story",
+    hex: "#C2B280",
+    desc: "Sandy warm tones for a beachy, breezy outfit",
+    badge: "🏖️",
+    gender: "all",
+  },
+  {
+    title: "Electric Blue",
+    hex: "#7DF9FF",
+    desc: "Go electric — bright, futuristic, fearless",
+    badge: "⚡",
+    gender: "all",
+  },
+  {
+    title: "Olive Street",
+    hex: "#808000",
+    desc: "Olive green streetwear — rugged and cool",
+    badge: "🪖",
+    gender: "male",
+  },
+  {
+    title: "Rose Gold Hour",
+    hex: "#B76E79",
+    desc: "Rose gold for a glamorous, glowing look",
+    badge: "🌹",
+    gender: "female",
+  },
+  {
+    title: "Sky High",
+    hex: "#87CEEB",
+    desc: "Sky blue — light, airy, and confident",
+    badge: "☁️",
+    gender: "all",
+  },
+  {
+    title: "Burgundy Evening",
+    hex: "#800020",
+    desc: "Deep burgundy for a sophisticated evening look",
+    badge: "🍷",
+    gender: "all",
+  },
+  {
+    title: "Pastel Splash",
+    hex: "#FFD1DC",
+    desc: "Mix soft pastels for a playful, fresh feel",
+    badge: "🎨",
+    gender: "all",
+  },
+  {
+    title: "Graphite Edge",
+    hex: "#6B6B6B",
+    desc: "Graphite grey — minimal, edgy, modern",
+    badge: "⚙️",
+    gender: "male",
+  },
+  {
+    title: "Champagne Toast",
+    hex: "#F7E7CE",
+    desc: "Champagne tones for a celebration-ready look",
+    badge: "🥂",
+    gender: "all",
+  },
+  {
+    title: "Peacock Statement",
+    hex: "#005F6B",
+    desc: "Deep peacock blue-green — bold and distinctive",
+    badge: "🦚",
+    gender: "all",
+  },
+];
+
+function getTodaysChallenge(gender: string) {
+  const dayIdx = new Date().getDate() % DAILY_CHALLENGES.length;
+  const base = DAILY_CHALLENGES[dayIdx];
+  // Find gender-relevant challenge starting from today's index
+  for (let i = 0; i < DAILY_CHALLENGES.length; i++) {
+    const c = DAILY_CHALLENGES[(dayIdx + i) % DAILY_CHALLENGES.length];
+    if (
+      c.gender === "all" ||
+      c.gender === (gender === "male" ? "male" : "female")
+    ) {
+      return c;
+    }
+  }
+  return base;
+}
+
+function DailyChallengeCard({ userGender }: { userGender: string }) {
+  const today = new Date().toDateString();
+  const challenge = getTodaysChallenge(userGender);
+  const storageKey = "cc_challenge_complete";
+
+  const [completed, setCompleted] = useState<{
+    date: string;
+    score: number;
+  } | null>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed.date === today ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [dismissed, setDismissed] = useState(() => {
+    const d = localStorage.getItem("cc_challenge_dismissed");
+    return d === today;
+  });
+
+  // Check lookbook for today's score on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional on-mount only check
+  useEffect(() => {
+    const todayStr = new Date().toDateString();
+    try {
+      const lookbook = JSON.parse(
+        localStorage.getItem("cc_lookbook") || "[]",
+      ) as Array<{ date: string; score: number }>;
+      const todayEntry = lookbook.find((e) =>
+        e.date?.startsWith(new Date().toISOString().slice(0, 10)),
+      );
+      if (todayEntry) {
+        const result = { date: todayStr, score: todayEntry.score };
+        setCompleted(result);
+        localStorage.setItem(storageKey, JSON.stringify(result));
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount
+
+  const handleShareChallenge = async () => {
+    if (!completed) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 800;
+      canvas.height = 450;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, 800, 450);
+      grad.addColorStop(0, challenge.hex);
+      grad.addColorStop(1, "#1a1a2e");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 450);
+
+      // Semi-transparent overlay
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, 800, 450);
+
+      // Challenge badge circle
+      ctx.beginPath();
+      ctx.arc(400, 160, 80, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Score
+      ctx.fillStyle = "#87CEEB";
+      ctx.font = "bold 64px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(`${completed.score}`, 400, 185);
+
+      // Labels
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 28px Arial";
+      ctx.fillText(`${challenge.badge} ${challenge.title}`, 400, 260);
+      ctx.font = "18px Arial";
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText("Challenge Complete!", 400, 295);
+
+      ctx.font = "bold 22px Arial";
+      ctx.fillStyle = "#FFD700";
+      ctx.fillText("COLOUR CLASH", 400, 350);
+      ctx.font = "14px Arial";
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.fillText("colourclash-emb.caffeine.xyz", 400, 375);
+
+      const caption = `I completed the ${challenge.title} Challenge! Score: ${completed.score}/100. Can you beat me? ${challenge.badge} #ColourClash`;
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "colour-clash-challenge.png";
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Challenge card downloaded! Share it with friends 🏆");
+        navigator.clipboard.writeText(caption).catch(() => {});
+      }, "image/png");
+    } catch (_e) {
+      toast.error("Could not generate share card");
+    }
+  };
+
+  if (dismissed) return null;
+
+  return (
+    <motion.div
+      className="ios-card overflow-hidden"
+      initial={{ opacity: 0, y: -12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -12, scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 360, damping: 30 }}
+      data-ocid="scanner.card"
+    >
+      {/* Color strip at top */}
+      <div
+        className="h-1.5"
+        style={{
+          background: `linear-gradient(90deg, ${challenge.hex}, ${challenge.hex}99)`,
+        }}
+      />
+
+      <div className="px-4 py-3">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-lg border-2 border-white/20"
+              style={{ backgroundColor: challenge.hex }}
+            >
+              {challenge.badge}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                  Today's Challenge
+                </span>
+                {completed && (
+                  <span className="text-[9px] bg-green-500/20 text-green-700 dark:text-green-400 font-bold rounded-full px-1.5 py-0.5">
+                    ✅ Done
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-black text-foreground">
+                {challenge.title}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem("cc_challenge_dismissed", today);
+              setDismissed(true);
+            }}
+            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 mt-0.5"
+            data-ocid="scanner.close_button"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+          {challenge.desc}
+        </p>
+
+        {completed ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-green-50 dark:bg-green-950/30 rounded-xl px-3 py-2 flex items-center gap-2">
+              <span
+                className="text-2xl font-black"
+                style={{ color: "#87CEEB" }}
+              >
+                {completed.score}
+              </span>
+              <div>
+                <p className="text-xs font-bold text-foreground">Your Score</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Challenge complete!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleShareChallenge}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
+              style={{
+                background: "linear-gradient(135deg, #9966cc 0%, #483d8b 100%)",
+              }}
+              data-ocid="scanner.secondary_button"
+            >
+              <Share2 className="w-3 h-3" />
+              Share
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              toast.info("Go to the Score tab to complete your challenge! ⭐", {
+                duration: 4000,
+              })
+            }
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
+            style={{
+              background: `linear-gradient(135deg, ${challenge.hex}ee 0%, ${challenge.hex}88 100%)`,
+            }}
+            data-ocid="scanner.primary_button"
+          >
+            🏆 Accept & Score
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 // ── Color Psychology ──────────────────────────────────────────────────────
 function getColorPsychology(hex: string): string {
   const r = Number.parseInt(hex.slice(1, 3), 16);
@@ -1834,6 +2287,11 @@ export default function ScannerPage() {
 
       {/* ── Style Streak ── */}
       <StyleStreakBadge />
+
+      {/* ── Daily Challenge ── */}
+      <AnimatePresence>
+        <DailyChallengeCard userGender={selectedGender} />
+      </AnimatePresence>
 
       {/* ── Filters (Collapsible) ── */}
       <motion.div
@@ -2743,10 +3201,25 @@ export default function ScannerPage() {
               {showPalette &&
                 (() => {
                   const [h, s, l] = hexToHsl(activeColor);
-                  const compHex = hslToHex((h + 180) % 360, s, l);
-                  const tri1Hex = hslToHex((h + 120) % 360, s, l);
-                  const tri2Hex = hslToHex((h + 240) % 360, s, l);
-                  const neutralHex = hslToHex(h, Math.max(0, s * 0.2), l);
+                  // Fix: ensure visually distinct swatches even for greys/whites/blacks
+                  const sBase = s < 0.1 ? 0.55 : s;
+                  const lBase = l < 0.15 ? 0.35 : l > 0.85 ? 0.65 : l;
+                  const compHex = hslToHex(
+                    (h + 180) % 360,
+                    sBase,
+                    lBase > 0.5 ? lBase - 0.15 : lBase + 0.15,
+                  );
+                  const tri1Hex = hslToHex(
+                    (h + 120) % 360,
+                    sBase * 0.9,
+                    Math.min(0.75, lBase + 0.1),
+                  );
+                  const tri2Hex = hslToHex(
+                    (h + 240) % 360,
+                    sBase * 0.85,
+                    Math.max(0.25, lBase - 0.1),
+                  );
+                  const neutralHex = hslToHex(h, 0.08, 0.88); // always near-white neutral
                   const swatches = [
                     { hex: activeColor, label: "Primary" },
                     { hex: compHex, label: "Complement" },

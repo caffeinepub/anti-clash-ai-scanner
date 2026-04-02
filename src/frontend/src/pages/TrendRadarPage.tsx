@@ -1,8 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, TrendingUp } from "lucide-react";
+import { Download, Loader2, RefreshCw, TrendingUp } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { SiWhatsapp } from "react-icons/si";
 import { toast } from "sonner";
 import { useFilters } from "../context/FilterContext";
 
@@ -156,6 +157,317 @@ const RETAILER_FILTER = [
   },
 ];
 
+// ── Seasonal Palette Forecast ─────────────────────────────────────────────
+const SEASON_PALETTES = {
+  wedding: {
+    name: "Wedding & Festive Season",
+    emoji: "💍",
+    desc: "Rich, celebratory tones — perfect for shaadi season",
+    gradientFrom: "#8B0000",
+    gradientTo: "#800020",
+    colors: [
+      { name: "Royal Red", hex: "#8B0000", garment: "Lehenga/Kurta" },
+      { name: "Deep Maroon", hex: "#800000", garment: "Saree/Sherwani" },
+      { name: "Champagne Gold", hex: "#F7E7CE", garment: "Blouse/Dupatta" },
+      { name: "Midnight Navy", hex: "#000080", garment: "Suit/Dress" },
+      { name: "Dusty Rose", hex: "#DCAE96", garment: "Lehenga/Top" },
+      { name: "Emerald", hex: "#50C878", garment: "Saree/Kurta" },
+    ],
+  },
+  summer: {
+    name: "Summer Vibes",
+    emoji: "☀️",
+    desc: "Fresh, breezy tones for the Indian summer heat",
+    gradientFrom: "#87CEEB",
+    gradientTo: "#0047AB",
+    colors: [
+      { name: "Sky Blue", hex: "#87CEEB", garment: "Cotton Shirt/Top" },
+      { name: "Mint Green", hex: "#98FF98", garment: "Casual Dress/Kurta" },
+      { name: "Lemon Yellow", hex: "#FFF44F", garment: "Kurti/Shorts" },
+      { name: "Coral Pink", hex: "#FF6B6B", garment: "Linen Shirt/Dress" },
+      { name: "Ivory White", hex: "#FFFFF0", garment: "Everything" },
+      { name: "Powder Blue", hex: "#B0C4DE", garment: "Pants/Salwar" },
+    ],
+  },
+  monsoon: {
+    name: "Monsoon & Earthy Tones",
+    emoji: "🌧️",
+    desc: "Rich earthy tones for the cozy monsoon season",
+    gradientFrom: "#C1694F",
+    gradientTo: "#355E3B",
+    colors: [
+      { name: "Terracotta", hex: "#E2725B", garment: "Kurta/Jacket" },
+      { name: "Forest Green", hex: "#228B22", garment: "Shirt/Saree" },
+      { name: "Mustard", hex: "#FFDB58", garment: "Kurti/Top" },
+      { name: "Rust Orange", hex: "#CC5500", garment: "Jacket/Dupatta" },
+      { name: "Warm Brown", hex: "#8B4513", garment: "Trousers/Pants" },
+      { name: "Olive", hex: "#808000", garment: "Shirt/Coord Set" },
+    ],
+  },
+};
+
+function getCurrentSeason(): keyof typeof SEASON_PALETTES {
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month >= 10 || month <= 2) return "wedding";
+  if (month >= 3 && month <= 5) return "summer";
+  return "monsoon";
+}
+
+function SeasonalPaletteForecast({
+  gender,
+  activeRetailer,
+}: { gender: string; activeRetailer: string }) {
+  const [selectedColor, setSelectedColor] = useState<{
+    name: string;
+    hex: string;
+    garment: string;
+  } | null>(null);
+  const seasonKey = getCurrentSeason();
+  const season = SEASON_PALETTES[seasonKey];
+
+  const getShopUrl = (colorName: string) => {
+    const genderKeyword = gender === "male" ? "mens" : "womens";
+    const q = encodeURIComponent(`${colorName} ${genderKeyword} fashion`);
+    switch (activeRetailer) {
+      case "indya":
+        return `https://www.houseofindya.com/Colourclash?q=${q}`;
+      case "amazon":
+        return `https://www.amazon.in/s?k=${q}`;
+      case "flipkart":
+        return `https://www.flipkart.com/search?q=${q}`;
+      case "myntra":
+        return `https://www.myntra.com/${genderKeyword}?rawQuery=${q}`;
+      case "ajio":
+        return `https://www.ajio.com/search/?text=${q}`;
+      case "meesho":
+        return `https://www.meesho.com/search?q=${q}`;
+      case "nykaa":
+        return `https://www.nykaa.com/search/result/?q=${q}`;
+      case "offduty":
+        return `https://offduty.in/search?q=${q}`;
+      default:
+        return `https://www.amazon.in/s?k=${q}`;
+    }
+  };
+
+  const handleShare = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 420;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const grad = ctx.createLinearGradient(0, 0, 800, 420);
+    grad.addColorStop(0, season.gradientFrom);
+    grad.addColorStop(1, season.gradientTo);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 800, 420);
+
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, 800, 420);
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("COLOUR CLASH TREND FORECAST", 400, 45);
+
+    ctx.font = "44px Arial";
+    ctx.fillText(season.emoji, 400, 100);
+
+    ctx.font = "bold 28px Arial";
+    ctx.fillStyle = "#FFD700";
+    ctx.fillText(season.name, 400, 145);
+
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillText(season.desc, 400, 175);
+
+    // Color circles
+    const startX = 400 - (season.colors.length * 55) / 2;
+    for (let i = 0; i < season.colors.length; i++) {
+      const cx = startX + i * 55 + 27;
+      ctx.beginPath();
+      ctx.arc(cx, 240, 24, 0, Math.PI * 2);
+      ctx.fillStyle = season.colors[i].hex;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.4)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "11px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(season.colors[i].name, cx, 275);
+    }
+
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 18px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("COLOUR CLASH", 400, 340);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "13px Arial";
+    ctx.fillText("colourclash-emb.caffeine.xyz", 400, 365);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `colour-clash-forecast-${seasonKey}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const caption = `This ${season.name} palette is 🔥 according to Colour Clash! Are you ready? #ColourClash #FashionForecast`;
+      navigator.clipboard.writeText(caption).catch(() => {});
+      toast.success("Forecast card downloaded! Caption copied.");
+    }, "image/png");
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 340, damping: 28 }}
+      className="rounded-3xl overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, ${season.gradientFrom}dd, ${season.gradientTo}cc)`,
+      }}
+      data-ocid="trends.card"
+    >
+      {/* Glow effect */}
+      <div
+        style={{
+          position: "absolute",
+          top: -20,
+          right: -20,
+          width: 100,
+          height: 100,
+          borderRadius: "50%",
+          background: "rgba(255,225,53,0.15)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-0.5">
+              📅 Seasonal Forecast
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{season.emoji}</span>
+              <p className="text-lg font-black text-white leading-tight">
+                {season.name}
+              </p>
+            </div>
+            <p className="text-xs text-white/70 mt-0.5">{season.desc}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="flex flex-col items-center gap-1 ml-2"
+            data-ocid="trends.secondary_button"
+          >
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
+              <Download className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-[9px] text-white/60 font-bold">Share</span>
+          </button>
+        </div>
+
+        {/* Color circles */}
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {season.colors.map((color) => (
+            <button
+              key={color.hex}
+              type="button"
+              onClick={() =>
+                setSelectedColor(
+                  selectedColor?.hex === color.hex ? null : color,
+                )
+              }
+              className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+              data-ocid="trends.button"
+            >
+              <div
+                className="w-10 h-10 rounded-full border-2 transition-all shadow-md"
+                style={{
+                  backgroundColor: color.hex,
+                  borderColor:
+                    selectedColor?.hex === color.hex
+                      ? "#FFD700"
+                      : "rgba(255,255,255,0.3)",
+                  transform:
+                    selectedColor?.hex === color.hex
+                      ? "scale(1.15)"
+                      : "scale(1)",
+                }}
+              />
+              <span className="text-[9px] text-white/70 text-center leading-tight max-w-[40px] line-clamp-2">
+                {color.name}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Selected color shop link */}
+        <AnimatePresence>
+          {selectedColor && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-white/10 rounded-2xl p-3 mb-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-6 h-6 rounded-full border-2 border-white/40 flex-shrink-0"
+                    style={{ backgroundColor: selectedColor.hex }}
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-white">
+                      {selectedColor.name}
+                    </p>
+                    <p className="text-[10px] text-white/60">
+                      {selectedColor.garment}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={getShopUrl(selectedColor.name)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-white bg-white/20 hover:bg-white/30 transition-colors"
+                  data-ocid="trends.link"
+                >
+                  🛍️ Shop {selectedColor.name}
+                  {activeRetailer !== "all"
+                    ? ` on ${RETAILER_FILTER.find((r) => r.key === activeRetailer)?.label || ""}`
+                    : ""}
+                </a>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Share WhatsApp */}
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(`This ${season.name} palette is 🔥 from Colour Clash! Try it at colourclash-emb.caffeine.xyz #ColourClash #FashionForecast`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-xs font-bold"
+          style={{
+            background: "rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,255,255,0.2)",
+          }}
+          data-ocid="trends.link"
+        >
+          <SiWhatsapp className="w-3.5 h-3.5" /> Share This Forecast
+        </a>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function TrendRadarPage() {
   const { gender } = useFilters();
   const [trends, setTrends] = useState<Trend[]>(() => loadCache() ?? []);
@@ -243,6 +555,12 @@ export default function TrendRadarPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-4">
+      {/* ── Seasonal Palette Forecast ── */}
+      <SeasonalPaletteForecast
+        gender={gender}
+        activeRetailer={selectedRetailer}
+      />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display font-bold text-2xl text-foreground">

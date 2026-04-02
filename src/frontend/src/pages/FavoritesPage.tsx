@@ -588,6 +588,479 @@ function SavedLooksTab() {
   );
 }
 
+// ── Style DNA Report ─────────────────────────────────────────────────────
+interface StyleDNAProfile {
+  type: string;
+  emoji: string;
+  tagline: string;
+  gradientFrom: string;
+  gradientTo: string;
+  dimensions: { label: string; pct: number; color: string }[];
+}
+
+function analyzeStyleDNA(allHexes: string[]): StyleDNAProfile {
+  if (allHexes.length === 0) {
+    return {
+      type: "Style Explorer",
+      emoji: "🌟",
+      tagline: "Scan more outfits to reveal your style DNA!",
+      gradientFrom: "#9966cc",
+      gradientTo: "#483d8b",
+      dimensions: [],
+    };
+  }
+  const counts = { earthy: 0, bold: 0, cool: 0, green: 0, purple: 0, mono: 0 };
+  for (const hex of allHexes) {
+    const [h, s, _l] = hexToHsl(hex);
+    if (s < 10) {
+      counts.mono++;
+      continue;
+    }
+    if ((h >= 20 && h < 60) || s < 20) {
+      counts.earthy++;
+      continue;
+    }
+    if ((h < 20 || h >= 340) && s > 40) {
+      counts.bold++;
+      continue;
+    }
+    if (h >= 180 && h < 260) {
+      counts.cool++;
+      continue;
+    }
+    if (h >= 80 && h < 160) {
+      counts.green++;
+      continue;
+    }
+    if (h >= 280 && h < 340) {
+      counts.purple++;
+      continue;
+    }
+    counts.earthy++;
+  }
+
+  const total = allHexes.length || 1;
+  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+
+  const profiles: Record<string, StyleDNAProfile> = {
+    earthy: {
+      type: "Warm Earth Toner",
+      emoji: "🌾",
+      tagline:
+        "Grounded, timeless, and effortlessly natural — earth tones are your signature.",
+      gradientFrom: "#C68642",
+      gradientTo: "#6b4226",
+      dimensions: [
+        {
+          label: "Earthy",
+          pct: Math.round((counts.earthy / total) * 100),
+          color: "#C68642",
+        },
+        {
+          label: "Bold",
+          pct: Math.round((counts.bold / total) * 100),
+          color: "#DC143C",
+        },
+        {
+          label: "Cool",
+          pct: Math.round((counts.cool / total) * 100),
+          color: "#0047AB",
+        },
+      ],
+    },
+    bold: {
+      type: "Bold Statement Maker",
+      emoji: "🔥",
+      tagline:
+        "Fearless and vibrant — your style speaks before you say a word.",
+      gradientFrom: "#DC143C",
+      gradientTo: "#8B0000",
+      dimensions: [
+        {
+          label: "Bold",
+          pct: Math.round((counts.bold / total) * 100),
+          color: "#DC143C",
+        },
+        {
+          label: "Earthy",
+          pct: Math.round((counts.earthy / total) * 100),
+          color: "#C68642",
+        },
+        {
+          label: "Cool",
+          pct: Math.round((counts.cool / total) * 100),
+          color: "#0047AB",
+        },
+      ],
+    },
+    cool: {
+      type: "Cool Minimalist",
+      emoji: "❄️",
+      tagline:
+        "Clean, calm, and perfectly composed — blue tones radiate quiet confidence.",
+      gradientFrom: "#0047AB",
+      gradientTo: "#000080",
+      dimensions: [
+        {
+          label: "Cool",
+          pct: Math.round((counts.cool / total) * 100),
+          color: "#0047AB",
+        },
+        {
+          label: "Neutral",
+          pct: Math.round((counts.mono / total) * 100),
+          color: "#808080",
+        },
+        {
+          label: "Bold",
+          pct: Math.round((counts.bold / total) * 100),
+          color: "#DC143C",
+        },
+      ],
+    },
+    green: {
+      type: "Nature Forward",
+      emoji: "🌿",
+      tagline:
+        "Organic, fresh, and ahead of the curve — nature is your palette.",
+      gradientFrom: "#228B22",
+      gradientTo: "#355E3B",
+      dimensions: [
+        {
+          label: "Nature",
+          pct: Math.round((counts.green / total) * 100),
+          color: "#228B22",
+        },
+        {
+          label: "Earthy",
+          pct: Math.round((counts.earthy / total) * 100),
+          color: "#C68642",
+        },
+        {
+          label: "Bold",
+          pct: Math.round((counts.bold / total) * 100),
+          color: "#DC143C",
+        },
+      ],
+    },
+    purple: {
+      type: "Pastel Dreamer",
+      emoji: "💜",
+      tagline:
+        "Soft, dreamy, and romantically expressive — pastels and purples are your world.",
+      gradientFrom: "#9B2335",
+      gradientTo: "#C8A2C8",
+      dimensions: [
+        {
+          label: "Purple/Pink",
+          pct: Math.round((counts.purple / total) * 100),
+          color: "#DDA0DD",
+        },
+        {
+          label: "Soft",
+          pct: Math.round((counts.earthy / total) * 100),
+          color: "#DCAE96",
+        },
+        {
+          label: "Cool",
+          pct: Math.round((counts.cool / total) * 100),
+          color: "#0047AB",
+        },
+      ],
+    },
+    mono: {
+      type: "Monochrome Master",
+      emoji: "🖤",
+      tagline: "Effortlessly sleek — you know that less is always more.",
+      gradientFrom: "#2d2d2d",
+      gradientTo: "#6b6b6b",
+      dimensions: [
+        {
+          label: "Neutral",
+          pct: Math.round((counts.mono / total) * 100),
+          color: "#808080",
+        },
+        {
+          label: "Earthy",
+          pct: Math.round((counts.earthy / total) * 100),
+          color: "#C68642",
+        },
+        {
+          label: "Bold",
+          pct: Math.round((counts.bold / total) * 100),
+          color: "#DC143C",
+        },
+      ],
+    },
+  };
+
+  return (
+    profiles[dominant] ?? {
+      type: "Eclectic Trendsetter",
+      emoji: "🎨",
+      tagline: "Unpredictable and exciting — your style defies every category.",
+      gradientFrom: "#9966cc",
+      gradientTo: "#DC143C",
+      dimensions: [
+        { label: "Bold", pct: 35, color: "#DC143C" },
+        { label: "Cool", pct: 30, color: "#0047AB" },
+        { label: "Earthy", pct: 35, color: "#C68642" },
+      ],
+    }
+  );
+}
+
+function StyleDNACard() {
+  const [dna, setDna] = useState<StyleDNAProfile | null>(null);
+  const [topColors, setTopColors] = useState<string[]>([]);
+  const [hasHistory, setHasHistory] = useState(false);
+
+  useEffect(() => {
+    const lookbook = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("cc_lookbook") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+    const palettes = (() => {
+      try {
+        return JSON.parse(localStorage.getItem("cc_favourites") || "[]");
+      } catch {
+        return [];
+      }
+    })();
+
+    const allHexes: string[] = [];
+    for (const e of lookbook) {
+      if (e.result?.primaryColor) allHexes.push(e.result.primaryColor);
+    }
+    for (const p of palettes) {
+      if (p.hex) allHexes.push(p.hex);
+    }
+
+    const has = allHexes.length >= 1;
+    setHasHistory(has);
+    if (has) {
+      setTopColors(allHexes.slice(0, 5));
+      setDna(analyzeStyleDNA(allHexes));
+    }
+  }, []);
+
+  const handleShare = async () => {
+    if (!dna) return;
+    const profileName = (() => {
+      try {
+        const p = JSON.parse(localStorage.getItem("cc_profile") || "{}");
+        return p.name || "";
+      } catch {
+        return "";
+      }
+    })();
+
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 800;
+      canvas.height = 500;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const grad = ctx.createLinearGradient(0, 0, 800, 500);
+      grad.addColorStop(0, dna.gradientFrom);
+      grad.addColorStop(1, dna.gradientTo);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 800, 500);
+
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.fillRect(0, 0, 800, 500);
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 20px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("MY STYLE DNA", 400, 50);
+
+      ctx.font = "64px Arial";
+      ctx.fillText(dna.emoji, 400, 120);
+
+      ctx.font = "bold 36px Arial";
+      ctx.fillText(dna.type, 400, 165);
+
+      if (profileName) {
+        ctx.font = "18px Arial";
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.fillText(`${profileName}'s Style`, 400, 195);
+      }
+
+      // Top colors
+      const startX = 400 - (topColors.length * 35) / 2;
+      for (let i = 0; i < topColors.length; i++) {
+        ctx.beginPath();
+        ctx.arc(startX + i * 35 + 17, 250, 16, 0, Math.PI * 2);
+        ctx.fillStyle = topColors[i];
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "16px Arial";
+      ctx.fillText(dna.tagline, 400, 310);
+
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 20px Arial";
+      ctx.fillText("COLOUR CLASH", 400, 380);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "14px Arial";
+      ctx.fillText("colourclash-emb.caffeine.xyz", 400, 405);
+
+      const caption = `I'm a ${dna.type} ${dna.emoji} according to Colour Clash AI! What's your style DNA? Scan to find out! #ColourClash #StyleDNA`;
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "style-dna.png";
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Style DNA card downloaded!");
+        navigator.clipboard.writeText(caption).catch(() => {});
+      }, "image/png");
+    } catch {
+      toast.error("Could not generate DNA card");
+    }
+  };
+
+  if (!hasHistory) {
+    return (
+      <div
+        style={{
+          background: "linear-gradient(135deg, #9966cc22, #483d8b11)",
+          border: "1px dashed #9966cc44",
+          borderRadius: 16,
+          padding: "16px",
+          marginBottom: 20,
+          textAlign: "center",
+        }}
+      >
+        <p className="text-2xl mb-2">🧬</p>
+        <p className="text-sm font-semibold" style={{ color: "#9966cc" }}>
+          Unlock Your Style DNA
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Scan 3+ outfits and save palettes to reveal your personal style
+          archetype
+        </p>
+      </div>
+    );
+  }
+
+  if (!dna) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 340, damping: 28 }}
+      style={{
+        background: `linear-gradient(135deg, ${dna.gradientFrom}dd, ${dna.gradientTo}cc)`,
+        borderRadius: 20,
+        padding: "16px",
+        marginBottom: 20,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* Glow */}
+      <div
+        style={{
+          position: "absolute",
+          top: -40,
+          right: -40,
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.08)",
+          pointerEvents: "none",
+        }}
+      />
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest text-white/60 mb-0.5">
+            🧬 Your Style DNA
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{dna.emoji}</span>
+            <p className="text-xl font-black text-white">{dna.type}</p>
+          </div>
+          <p className="text-xs text-white/70 mt-1 leading-relaxed max-w-[220px]">
+            {dna.tagline}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleShare}
+          className="flex flex-col items-center gap-1 mt-1"
+          data-ocid="favorites.secondary_button"
+        >
+          <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
+            <span className="text-base">📤</span>
+          </div>
+          <span className="text-[9px] text-white/60 font-bold">Share DNA</span>
+        </button>
+      </div>
+
+      {/* Top colors */}
+      {topColors.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[10px] text-white/60 font-bold uppercase tracking-wider">
+            Your colours
+          </span>
+          <div className="flex gap-1.5">
+            {topColors.map((hex, _i) => (
+              <div
+                key={hex}
+                className="w-6 h-6 rounded-full border-2 border-white/30 shadow-sm"
+                style={{ backgroundColor: hex }}
+                title={hex}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dimension bars */}
+      {dna.dimensions.length > 0 && (
+        <div className="space-y-1.5">
+          {dna.dimensions.map((dim) => (
+            <div key={dim.label} className="flex items-center gap-2">
+              <span className="text-[10px] text-white/70 w-20 flex-shrink-0">
+                {dim.label}
+              </span>
+              <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${dim.pct}%` }}
+                  transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
+                  style={{
+                    height: "100%",
+                    borderRadius: 99,
+                    backgroundColor: dim.color,
+                  }}
+                />
+              </div>
+              <span className="text-[10px] text-white/60 w-8 text-right">
+                {dim.pct}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function FavoritesPage(_props?: {
   onNavigate?: (tab: string) => void;
 }) {
@@ -909,6 +1382,9 @@ export default function FavoritesPage(_props?: {
             </div>
           </div>
         </div>
+
+        {/* ── Style DNA Report ── */}
+        <StyleDNACard />
 
         {/* ── Camera scanner section ── */}
         <div

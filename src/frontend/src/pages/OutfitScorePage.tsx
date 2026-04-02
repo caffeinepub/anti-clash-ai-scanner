@@ -696,6 +696,219 @@ function LoadingPulse({ label }: { label: string }) {
 
 // ---- Share Image Helper ---------------------------------------------------
 
+// ---- Color Clash Battle Component ----------------------------------------
+function ColorClashBattle({
+  score,
+  photoDataUrl,
+}: {
+  score: number;
+  photoDataUrl: string | null;
+}) {
+  const [showBattle, setShowBattle] = useState(false);
+  const [battleImageUrl, setBattleImageUrl] = useState<string | null>(null);
+  const [battleCaption, setBattleCaption] = useState("");
+
+  const buildBattleCard = async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 800;
+    canvas.height = 600;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Background
+    ctx.fillStyle = "#0d0d1a";
+    ctx.fillRect(0, 0, 800, 600);
+
+    // Left panel — photo or color block
+    if (photoDataUrl) {
+      await new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 0, 480, 600);
+          ctx.clip();
+          ctx.drawImage(img, 0, 0, 480, 600);
+          ctx.restore();
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = photoDataUrl;
+      });
+    } else {
+      const grad = ctx.createLinearGradient(0, 0, 480, 600);
+      grad.addColorStop(0, "#9966cc");
+      grad.addColorStop(1, "#483d8b");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 480, 600);
+    }
+
+    // Dark overlay on left
+    const leftOverlay = ctx.createLinearGradient(0, 0, 480, 0);
+    leftOverlay.addColorStop(0, "rgba(0,0,0,0.2)");
+    leftOverlay.addColorStop(1, "rgba(0,0,0,0.7)");
+    ctx.fillStyle = leftOverlay;
+    ctx.fillRect(0, 0, 480, 600);
+
+    // Score badge on photo
+    ctx.beginPath();
+    ctx.arc(380, 80, 55, 0, Math.PI * 2);
+    ctx.fillStyle = "#87CEEB";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 42px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(String(score), 380, 96);
+
+    // Right panel
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.fillRect(480, 0, 320, 600);
+
+    // VS badge
+    ctx.beginPath();
+    ctx.arc(480, 300, 36, 0, Math.PI * 2);
+    ctx.fillStyle = "#DC143C";
+    ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("VS", 480, 308);
+
+    // Right panel text
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 56px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(String(score), 640, 240);
+    ctx.font = "bold 16px Arial";
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.fillText("/100", 640, 265);
+
+    ctx.fillStyle = "#87CEEB";
+    ctx.font = "bold 18px Arial";
+    ctx.fillText(`CAN YOU BEAT ${score}?`, 640, 320);
+
+    ctx.fillStyle = "#FFD700";
+    ctx.font = "bold 20px Arial";
+    ctx.fillText("COLOUR CLASH", 640, 400);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "13px Arial";
+    ctx.fillText("colourclash-emb.caffeine.xyz", 640, 425);
+
+    const caption = `I just scored ${score}/100 on Colour Clash! Think you can beat me? Scan the QR code to try! ⚔️ #ColourClash #ColorClashBattle`;
+    setBattleCaption(caption);
+    navigator.clipboard.writeText(caption).catch(() => {});
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      if (battleImageUrl) URL.revokeObjectURL(battleImageUrl);
+      setBattleImageUrl(URL.createObjectURL(blob));
+    }, "image/png");
+  };
+
+  if (score === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 340, damping: 28 }}
+      className="mt-4 bg-card border border-border/30 rounded-2xl p-4"
+      data-ocid="score.card"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-lg">
+          ⚔️
+        </div>
+        <div>
+          <p className="text-sm font-bold text-foreground">
+            Color Clash Battle
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Challenge a friend — dare them to beat your score!
+          </p>
+        </div>
+      </div>
+
+      {!showBattle ? (
+        <button
+          type="button"
+          onClick={() => {
+            setShowBattle(true);
+            buildBattleCard();
+          }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 hover:opacity-90"
+          style={{
+            background: "linear-gradient(135deg, #DC143C 0%, #8B0000 100%)",
+          }}
+          data-ocid="score.primary_button"
+        >
+          ⚔️ Generate Battle Card
+        </button>
+      ) : (
+        <div className="space-y-3">
+          {battleImageUrl && (
+            <div className="rounded-xl overflow-hidden border border-border/30">
+              <img
+                src={battleImageUrl}
+                alt="Battle card"
+                className="w-full object-contain"
+              />
+            </div>
+          )}
+          {battleCaption && (
+            <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
+              {battleCaption}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!battleImageUrl) return;
+                const a = document.createElement("a");
+                a.href = battleImageUrl;
+                a.download = "colour-clash-battle.png";
+                a.click();
+                toast.success("Battle card downloaded!");
+              }}
+              className="flex items-center justify-center gap-2 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+              data-ocid="score.secondary_button"
+            >
+              <Download className="w-4 h-4" /> Download
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(battleCaption)
+                  .then(() => toast.success("Caption copied!"))
+                  .catch(() => {});
+              }}
+              className="flex items-center justify-center gap-2 py-2 rounded-xl bg-muted text-foreground text-sm font-semibold"
+              data-ocid="score.secondary_button"
+            >
+              <Copy className="w-4 h-4" /> Copy Caption
+            </button>
+          </div>
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(battleCaption)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-sm font-semibold"
+            style={{ background: "#25D366" }}
+            data-ocid="score.link"
+          >
+            <SiWhatsapp className="w-4 h-4" /> Share Battle on WhatsApp
+          </a>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 // ---- Main Component -------------------------------------------------------
 
 export default function OutfitScorePage({
@@ -2045,6 +2258,12 @@ ${APP_LINK}`);
             )}
           </div>
         )}
+
+        {/* ⚔️ Color Clash Battle */}
+        <ColorClashBattle
+          score={currentEntry?.score ?? 0}
+          photoDataUrl={currentEntry?.photoDataUrl ?? null}
+        />
 
         {/* Share sheet */}
         <AnimatePresence>
