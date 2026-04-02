@@ -27,7 +27,7 @@
   :root {
     --radius: 1rem;
     /* Royal White & Blue — Light Mode */
-    --background: 0.97 0.008 255;
+    --background: 0.98 0.005 90;
     --foreground: 0.16 0.025 255;
     --card: 0.99 0.003 255;
     --card-foreground: 0.16 0.025 255;
@@ -76,6 +76,18 @@
     font-family: "Plus Jakarta Sans", "Figtree", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #fafaf9;
+    background-image: radial-gradient(
+        ellipse at top right,
+        rgba(255, 225, 53, 0.06) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse at bottom left,
+        rgba(255, 200, 180, 0.08) 0%,
+        transparent 60%
+      );
+    min-height: 100vh;
   }
 }
 
@@ -186,5 +198,25 @@
   .swatch-shadow {
     box-shadow: 0 4px 12px -2px oklch(0.42 0.22 255 / 0.25), 0 0 0 1.5px
       oklch(var(--border));
+  }
+}
+
+@layer components {
+  .creamy-card {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 28px;
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 40px rgba(180, 160, 140, 0.12);
+    transition: all 0.4s ease-in-out;
+  }
+
+  .rich-glow {
+    background: radial-gradient(
+      circle at top left,
+      rgba(255, 225, 53, 0.15) 0%,
+      rgba(255, 255, 255, 0) 60%
+    );
   }
 }

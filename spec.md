@@ -1,39 +1,55 @@
 # Colour Clash
 
 ## Current State
-- `ShopMatchingStyles` in `ScannerPage.tsx` uses `GarmentImageCard` which calls Gemini image generation API to produce product images. This API call often fails silently, resulting in broken/missing cards.
-- The `ColorPaletteCard` component exists with full SVG category icons and solid color backgrounds — this is what the Deals tab uses successfully.
-- `OutfitCard.handleSave` shows a toast but does NOT actually persist the outfit to localStorage — saved looks are never stored or shown in Favorites.
-- `FavoritesPage` has no section for saved AI outfit looks.
-- `OutfitScorePage` Path to 100% section shows 9 color swatches as circles with names, but no shop links.
+- GARMENT_TYPES in ScannerPage.tsx uses dual-labels: "Top / Shirt", "Bottom / Pants", "Scarf / Dupatta" etc.
+- COMPLEMENTARY_GARMENT_MAP maps old dual-labels to complementary garment suggestions
+- GARMENT_KEYWORD_MAP maps old labels to search keywords
+- ShopMatchingStyles renders sections per garment type, with one consolidated shop link per garment section per retailer tab -- BUT within each section multiple sections can produce repeated retailer banners across sections in the same retailer tab
+- buildRetailerUrl() builds URLs with gender prefix but does NOT pass gender as a URL query param to retailer sites that accept it
+- OutfitScorePage.tsx shows a score ring with grade letter (S/A/B/C/D/F) baked in, but NO explanation of what each grade means
+- QR code on share card is fetched via Google Charts API img tag drawn to canvas -- CORS causes it to taint the canvas and break PNG export
 
 ## Requested Changes (Diff)
 
 ### Add
-- In `OutfitScorePage`: Each Path-to-100% swatch gets a "Shop" tap → opens a small popover/sheet showing retailer links (Amazon, Flipkart, Myntra, Ajio, Nykaa, House of Indya) for that color + auto-detected garment category, filtered by the active gender from localStorage (`cc_gender`).
-- In `FavoritesPage`: New "Saved Looks" tab (alongside existing palettes / Couple Match). Reads from localStorage key `cc_saved_looks`. Displays each saved outfit exactly as it appears in OutfitCard (title, color chips per item, hairstyle). Includes a delete button per entry.
-- In `ScannerPage`: Replace `GarmentImageCard` (which calls Gemini) with a `PaletteIconCard` component — a solid color background square/rectangle in the `shopColor.hex` color, with a centered `CategoryIcon` SVG (white outline, same as `ColorPaletteCard`). This applies in BOTH the accordion view (ProductCard) and the tabs/retailer view.
+- Single-entity garment labels: Top, Shirt, Bottom, Pant, Blouse, Scarf, Dupatta, Skirt (+ keep existing: Dress, Jacket/Coat, Shoes/Footwear, Watch/Accessory, Bag/Purse, Saree/Ethnic Wear, Kurta/Kurti, Turban, Stole, Ethnic Wear, Suit/Blazer, Hoodie, Shorts, Jeans, Sneakers)
+- Blouse as a new high-priority garment category (female-weighted)
+- Dynamic complementary linking per item:
+  - Pant/Bottom selected (male) → show Shirts
+  - Pant/Bottom selected (female) → show Shirts + Tops
+  - Blouse selected → prioritize Saree/Ethnic Wear
+  - Scarf selected (female) → show everything applicable to female (Tops, Dress, Blouse, Kurta)
+  - Top/Shirt → show Pant/Bottom, Shoes, Accessories
+- Letter grade legend below the score ring: "S = Style Master • A = Great Look • B = Good Combo • C = Average • D = Needs Work • F = Bold Clash"
+- QR code for share card generated fully client-side using a pure JS QR library (qrcode.js or qr-creator) -- no external image fetching, no CORS
 
 ### Modify
-- `OutfitCard.handleSave` in `ScannerPage.tsx`: Actually save the outfit object to localStorage under key `cc_saved_looks` (array), with a unique `id` (timestamp), `savedAt` date, and all outfit fields. Show toast "Saved to Favourites!".
-- `ShopMatchingStyles` product cards: The image area uses the new `PaletteIconCard` instead of `GarmentImageCard`. The "Shop on [retailer]" link button must remain visible below the card.
+- GARMENT_TYPES array: remove all dual-label entries; replace with atomic single labels
+- GARMENT_KEYWORD_MAP: updated to match new atomic labels
+- COMPLEMENTARY_GARMENT_MAP: updated to reflect new labels + dynamic linking rules above
+- ShopMatchingStyles de-duplication: in the "tabs" (by-retailer) view, group all sections under one retailer tab and show only ONE consolidated shop link per retailer (not one per garment section per retailer). The per-section cards can still show, but there must be exactly one CTA button per retailer tab total.
+- buildRetailerUrl(): add gender URL parameter encoding for retailers that accept it:
+  - Myntra: use URL path gender prefix (e.g. /women/ or /men/)
+  - Amazon: add &rh=n:gender encoded in search
+  - Flipkart: encode gender in query
+  - Ajio, Meesho, Nykaa: append gender to search query string
+  - House of Indya, Offduty: gender in search query
+- Score ring in OutfitScorePage: add a small grade legend below the ring in the results view
 
 ### Remove
-- `GarmentImageCard` component and its import of `generateGarmentImage` (this removes the unnecessary Gemini image API call for product cards)
+- All dual-label garment buttons ("Top / Shirt", "Bottom / Pants", "Scarf / Dupatta") replaced by atomic alternatives
+- External QR code fetch (Google Charts API) replaced by client-side QR generation
 
 ## Implementation Plan
-1. In `ScannerPage.tsx`:
-   a. Remove `GarmentImageCard` and its Gemini import
-   b. Add `PaletteIconCard` — renders a solid color rectangle with a centered white SVG garment icon (reuse the same SVG paths as `ColorPaletteCard.CategoryIcon`)
-   c. Replace all `GarmentImageCard` usages with `PaletteIconCard`
-   d. Fix `OutfitCard.handleSave` to persist to `cc_saved_looks` in localStorage
+1. In ScannerPage.tsx:
+   a. Replace GARMENT_TYPES with atomic single-label list
+   b. Update GARMENT_KEYWORD_MAP to match new labels
+   c. Update COMPLEMENTARY_GARMENT_MAP with new dynamic per-item logic
+   d. In ShopMatchingStyles tabs view: deduplicate so only ONE consolidated "Shop [color] on [retailer]" button appears per retailer tab (not one per garment section)
+   e. Update buildRetailerUrl() to pass gender+color params to retailers that accept URL filters
 
-2. In `FavoritesPage.tsx`:
-   a. Add a "Saved Looks" tab
-   b. Load from `cc_saved_looks` localStorage key
-   c. Render each look with title, color swatches per item, and a delete button
+2. In OutfitScorePage.tsx:
+   a. Add grade legend string below score ring in results view
+   b. Replace Google Charts QR image fetch with client-side QR code generation (use canvas-based QR drawing or install qrcode npm package)
 
-3. In `OutfitScorePage.tsx`:
-   a. Make each Path-to-100% swatch tappable
-   b. On tap, show inline retailer links: for each of the 8 retailers, build a search URL for `{colorName} clothing` filtered by gender
-   c. Link text format: "Shop on Amazon", "Shop on Myntra", etc.
+3. Validate: lint + typecheck + build must pass

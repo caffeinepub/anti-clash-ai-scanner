@@ -15,43 +15,34 @@ import {
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-// QR code generated locally (no external package needed)
-function generateQRDataUrl(text: string, size = 120): Promise<string> {
-  return new Promise((resolve) => {
+import QRCode from "qrcode";
+
+// QR code generated locally using the qrcode package (no external HTTP calls, no CORS issues)
+async function generateQRDataUrl(text: string, size = 120): Promise<string> {
+  try {
+    return await QRCode.toDataURL(text, {
+      width: size,
+      margin: 1,
+      color: {
+        dark: "#000000",
+        light: "#FFFFFF",
+      },
+      errorCorrectionLevel: "M",
+    });
+  } catch {
+    // Fallback: solid black square
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      resolve("");
-      return;
-    }
-    // Simple QR placeholder using Google Charts API via data URL canvas draw
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    const encoded = encodeURIComponent(text);
-    img.src = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encoded}&choe=UTF-8`;
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, size, size);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => {
-      // Fallback: simple black square with white inner square
+    if (ctx) {
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, size, size);
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(4, 4, size - 8, size - 8);
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(8, 8, size - 16, size - 16);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(12, 12, size - 24, size - 24);
-      // Draw url text
-      ctx.fillStyle = "#000000";
-      ctx.font = `${Math.floor(size / 20)}px monospace`;
-      ctx.fillText("SCAN", size * 0.3, size * 0.5);
-      resolve(canvas.toDataURL("image/png"));
-    };
-  });
+    }
+    return canvas.toDataURL("image/png");
+  }
 }
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiTelegram, SiWhatsapp, SiX } from "react-icons/si";
@@ -1728,6 +1719,21 @@ ${APP_LINK}`);
                 CLASH SCORE
               </span>
             </div>
+          </div>
+
+          {/* Grade legend below score ring */}
+          <div className="text-center mt-2 px-2">
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              <span className="font-bold text-foreground">S</span> = Style
+              Master &bull; <span className="font-bold text-foreground">A</span>{" "}
+              = Great Look &bull;{" "}
+              <span className="font-bold text-foreground">B</span> = Good Combo
+              &bull; <span className="font-bold text-foreground">C</span> =
+              Average &bull;{" "}
+              <span className="font-bold text-foreground">D</span> = Needs Work
+              &bull; <span className="font-bold text-foreground">F</span> = Bold
+              Clash
+            </p>
           </div>
 
           {/* Score breakdown */}

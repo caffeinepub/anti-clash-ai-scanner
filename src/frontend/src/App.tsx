@@ -488,29 +488,31 @@ function AppContent() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-lg mx-auto w-full px-4 pt-5 pb-36 overflow-y-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ type: "spring", stiffness: 400, damping: 38 }}
-          >
-            {activeTab === "scanner" && <ScannerPage key={homeKey} />}
-            {activeTab === "favorites" && (
-              <FavoritesPage onNavigate={(tab) => setActiveTab(tab as Tab)} />
-            )}
-            {activeTab === "style" && <StyleGuidePage />}
-            {activeTab === "score" && (
-              <OutfitScorePage
-                onNavigateToSkinTone={() => setActiveTab("skintone")}
-              />
-            )}
-            {activeTab === "trends" && <TrendRadarPage />}
-            {activeTab === "skintone" && <SkinTonePage />}
-            {activeTab === "deals" && <BestDealsPage />}
-          </motion.div>
-        </AnimatePresence>
+        <div className="relative">
+          <div className={activeTab === "scanner" ? "block" : "hidden"}>
+            <ScannerPage key={homeKey} />
+          </div>
+          <div className={activeTab === "favorites" ? "block" : "hidden"}>
+            <FavoritesPage onNavigate={(tab) => setActiveTab(tab as Tab)} />
+          </div>
+          <div className={activeTab === "score" ? "block" : "hidden"}>
+            <OutfitScorePage
+              onNavigateToSkinTone={() => setActiveTab("skintone")}
+            />
+          </div>
+          <div className={activeTab === "trends" ? "block" : "hidden"}>
+            <TrendRadarPage />
+          </div>
+          <div className={activeTab === "deals" ? "block" : "hidden"}>
+            <BestDealsPage />
+          </div>
+          <div className={activeTab === "style" ? "block" : "hidden"}>
+            <StyleGuidePage />
+          </div>
+          <div className={activeTab === "skintone" ? "block" : "hidden"}>
+            <SkinTonePage />
+          </div>
+        </div>
       </main>
 
       {/* iOS Bottom Tab Bar */}

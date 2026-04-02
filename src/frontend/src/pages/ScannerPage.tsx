@@ -33,103 +33,99 @@ import {
 
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
-  { label: "Top / Shirt", emoji: "👕" },
-  { label: "Bottom / Pants", emoji: "👖" },
-  { label: "Dress", emoji: "👗" },
-  { label: "Jacket / Coat", emoji: "🧥" },
-  { label: "Shoes / Footwear", emoji: "👟" },
-  { label: "Watch / Accessory", emoji: "⌚" },
-  { label: "Bag / Purse", emoji: "👜" },
-  { label: "Saree / Ethnic Wear", emoji: "🥻" },
-  { label: "Kurta / Kurti", emoji: "🩱" },
-  { label: "Scarf / Dupatta", emoji: "🧣" },
+  { label: "Top", emoji: "👕" },
+  { label: "Shirt", emoji: "👔" },
+  { label: "Blouse", emoji: "👚" },
+  { label: "Pant", emoji: "👖" },
+  { label: "Bottom", emoji: "👖" },
+  { label: "Jeans", emoji: "👖" },
+  { label: "Shorts", emoji: "🩳" },
   { label: "Skirt", emoji: "👗" },
+  { label: "Dress", emoji: "👗" },
+  { label: "Jacket", emoji: "🧥" },
+  { label: "Suit", emoji: "🤵" },
+  { label: "Hoodie", emoji: "🧥" },
+  { label: "Shoes", emoji: "👟" },
+  { label: "Sneakers", emoji: "👟" },
+  { label: "Watch", emoji: "⌚" },
+  { label: "Bag", emoji: "👜" },
+  { label: "Saree", emoji: "🥻" },
+  { label: "Kurta", emoji: "🩱" },
+  { label: "Scarf", emoji: "🧣" },
+  { label: "Dupatta", emoji: "🧣" },
   { label: "Turban", emoji: "🎩" },
   { label: "Stole", emoji: "🧣" },
   { label: "Ethnic Wear", emoji: "🥻" },
-  { label: "Suit / Blazer", emoji: "🤵" },
-  { label: "Hoodie", emoji: "🧥" },
-  { label: "Shorts", emoji: "🩳" },
-  { label: "Jeans", emoji: "👖" },
-  { label: "Sneakers", emoji: "👟" },
 ];
 
 const GARMENT_KEYWORD_MAP: Record<string, string> = {
-  "Top / Shirt": "shirt",
-  "Bottom / Pants": "pants",
-  Dress: "dress",
-  "Jacket / Coat": "jacket",
-  "Shoes / Footwear": "shoes",
-  "Watch / Accessory": "watch",
-  "Bag / Purse": "bag",
-  "Saree / Ethnic Wear": "saree",
-  "Kurta / Kurti": "kurta",
-  "Scarf / Dupatta": "dupatta",
+  Top: "top",
+  Shirt: "shirt",
+  Blouse: "blouse",
+  Pant: "pant",
+  Bottom: "bottom",
+  Jeans: "jeans",
+  Shorts: "shorts",
   Skirt: "skirt",
+  Dress: "dress",
+  Jacket: "jacket",
+  Suit: "suit",
+  Hoodie: "hoodie",
+  Shoes: "shoes",
+  Sneakers: "sneakers",
+  Watch: "watch",
+  Bag: "bag",
+  Saree: "saree",
+  Kurta: "kurta",
+  Scarf: "scarf",
+  Dupatta: "dupatta",
   Turban: "turban",
   Stole: "stole",
   "Ethnic Wear": "ethnic wear",
-  "Suit / Blazer": "blazer",
-  Hoodie: "hoodie",
-  Shorts: "shorts",
-  Jeans: "jeans",
-  Sneakers: "sneakers",
 };
 
 const COMPLEMENTARY_GARMENT_MAP: Record<string, string[]> = {
-  "Top / Shirt": [
-    "Bottom / Pants",
-    "Shoes / Footwear",
-    "Watch / Accessory",
-    "Bag / Purse",
-    "Jacket / Coat",
-  ],
-  "Bottom / Pants": [
-    "Top / Shirt",
-    "Shoes / Footwear",
-    "Watch / Accessory",
-    "Bag / Purse",
-    "Jacket / Coat",
-  ],
-  Dress: [
-    "Shoes / Footwear",
-    "Bag / Purse",
-    "Watch / Accessory",
-    "Jacket / Coat",
-  ],
-  "Jacket / Coat": [
-    "Top / Shirt",
-    "Bottom / Pants",
-    "Shoes / Footwear",
-    "Watch / Accessory",
-  ],
-  "Shoes / Footwear": [
-    "Top / Shirt",
-    "Bottom / Pants",
-    "Watch / Accessory",
-    "Bag / Purse",
-  ],
-  "Watch / Accessory": [
-    "Top / Shirt",
-    "Bottom / Pants",
-    "Dress",
-    "Shoes / Footwear",
-  ],
-  "Bag / Purse": ["Top / Shirt", "Bottom / Pants", "Dress", "Shoes / Footwear"],
-  "Saree / Ethnic Wear": [
-    "Shoes / Footwear",
-    "Bag / Purse",
-    "Watch / Accessory",
-    "Kurta / Kurti",
-  ],
-  "Kurta / Kurti": [
-    "Bottom / Pants",
-    "Shoes / Footwear",
-    "Watch / Accessory",
-    "Bag / Purse",
-  ],
-  "Scarf / Dupatta": ["Top / Shirt", "Dress", "Jacket / Coat", "Kurta / Kurti"],
+  Top: ["Pant", "Jeans", "Bottom", "Shoes", "Watch", "Bag"],
+  Shirt: ["Pant", "Jeans", "Bottom", "Shoes", "Watch", "Bag"],
+  Blouse: ["Saree", "Skirt", "Shoes", "Watch", "Bag"],
+  Pant: ["Shirt", "Top", "Shoes", "Watch", "Bag"],
+  Bottom: ["Shirt", "Top", "Shoes", "Watch", "Bag"],
+  Jeans: ["Shirt", "Top", "Shoes", "Watch", "Bag"],
+  Shorts: ["Shirt", "Top", "Shoes", "Watch", "Bag"],
+  Skirt: ["Top", "Blouse", "Shirt", "Shoes", "Bag"],
+  Dress: ["Shoes", "Bag", "Watch", "Jacket"],
+  Jacket: ["Shirt", "Top", "Pant", "Jeans", "Shoes"],
+  Suit: ["Shirt", "Top", "Pant", "Jeans", "Shoes"],
+  Hoodie: ["Shirt", "Top", "Pant", "Jeans", "Shoes"],
+  Shoes: ["Top", "Shirt", "Pant", "Jeans"],
+  Sneakers: ["Top", "Shirt", "Pant", "Jeans"],
+  Watch: ["Shirt", "Top", "Dress", "Shoes"],
+  Bag: ["Top", "Shirt", "Dress", "Shoes"],
+  Saree: ["Shoes", "Bag", "Watch", "Blouse"],
+  Kurta: ["Pant", "Jeans", "Shoes", "Watch", "Bag"],
+  Scarf: ["Top", "Blouse", "Dress", "Kurta", "Shoes"],
+  Dupatta: ["Top", "Blouse", "Dress", "Kurta", "Shoes"],
+  Stole: ["Top", "Blouse", "Dress", "Kurta", "Shoes"],
+  Turban: ["Shirt", "Kurta", "Shoes"],
+  "Ethnic Wear": ["Shoes", "Bag", "Watch", "Blouse"],
 };
+
+// Gender-aware complementary label resolver
+function getComplementaryLabels(
+  garmentLabel: string,
+  gender: string,
+): string[] {
+  const isFemale = gender === "female" || gender === "women";
+  if (["Pant", "Bottom", "Jeans", "Shorts"].includes(garmentLabel)) {
+    return isFemale
+      ? ["Shirt", "Top", "Blouse", "Shoes", "Watch", "Bag"]
+      : ["Shirt", "Top", "Shoes", "Watch", "Bag"];
+  }
+  if (["Scarf", "Dupatta", "Stole"].includes(garmentLabel)) {
+    return ["Top", "Blouse", "Dress", "Kurta", "Shoes"];
+  }
+  return COMPLEMENTARY_GARMENT_MAP[garmentLabel] ?? ["Top", "Shoes"];
+}
 
 // ── Product catalog ────────────────────────────────────────────────────────
 interface ProductItem {
@@ -142,20 +138,20 @@ interface ProductItem {
 const PRODUCT_CATALOG: ProductItem[] = [
   // ── Men: Tops ──
   {
-    garmentLabel: "Top / Shirt",
+    garmentLabel: "Top",
     name: "Classic White Shirt",
     image: "/assets/generated/product-mens-shirt.dim_400x500.jpg",
     gender: "men",
   },
   {
-    garmentLabel: "Top / Shirt",
+    garmentLabel: "Top",
     name: "Casual Grey T-Shirt",
     image: "/assets/generated/product-mens-tshirt.dim_400x500.jpg",
     gender: "men",
   },
   // ── Men: Bottoms ──
   {
-    garmentLabel: "Bottom / Pants",
+    garmentLabel: "Pant",
     name: "Chino Trousers",
     image: "/assets/generated/product-mens-trousers.dim_400x500.jpg",
     gender: "men",
@@ -168,46 +164,46 @@ const PRODUCT_CATALOG: ProductItem[] = [
   },
   // ── Men: Shoes ──
   {
-    garmentLabel: "Shoes / Footwear",
+    garmentLabel: "Shoes",
     name: "White Sneakers",
     image: "/assets/generated/product-mens-shoes.dim_400x500.jpg",
     gender: "men",
   },
   {
-    garmentLabel: "Shoes / Footwear",
+    garmentLabel: "Shoes",
     name: "Tan Loafers",
     image: "/assets/generated/product-mens-loafers.dim_400x500.jpg",
     gender: "men",
   },
   // ── Men: Accessories ──
   {
-    garmentLabel: "Watch / Accessory",
+    garmentLabel: "Watch",
     name: "Classic Watch",
     image: "/assets/generated/product-mens-watch.dim_400x500.jpg",
     gender: "men",
   },
   {
-    garmentLabel: "Bag / Purse",
+    garmentLabel: "Bag",
     name: "Messenger Bag",
     image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
     gender: "men",
   },
   // ── Women: Tops ──
   {
-    garmentLabel: "Top / Shirt",
+    garmentLabel: "Top",
     name: "Floral Top",
     image: "/assets/generated/product-womens-top.dim_400x500.jpg",
     gender: "women",
   },
   {
-    garmentLabel: "Kurta / Kurti",
+    garmentLabel: "Kurta",
     name: "Embroidered Kurti",
     image: "/assets/generated/product-womens-kurta.dim_400x500.jpg",
     gender: "women",
   },
   // ── Women: Bottoms ──
   {
-    garmentLabel: "Bottom / Pants",
+    garmentLabel: "Pant",
     name: "Palazzo Pants",
     image: "/assets/generated/product-womens-pants.dim_400x500.jpg",
     gender: "women",
@@ -219,59 +215,59 @@ const PRODUCT_CATALOG: ProductItem[] = [
     gender: "women",
   },
   {
-    garmentLabel: "Saree / Ethnic Wear",
+    garmentLabel: "Saree",
     name: "Silk Saree",
     image: "/assets/generated/product-womens-saree.dim_400x500.jpg",
     gender: "women",
   },
   // ── Women: Shoes ──
   {
-    garmentLabel: "Shoes / Footwear",
+    garmentLabel: "Shoes",
     name: "Stiletto Heels",
     image: "/assets/generated/product-womens-heels.dim_400x500.jpg",
     gender: "women",
   },
   {
-    garmentLabel: "Shoes / Footwear",
+    garmentLabel: "Shoes",
     name: "White Sneakers",
     image: "/assets/generated/product-womens-sneakers.dim_400x500.jpg",
     gender: "women",
   },
   // ── Women: Accessories ──
   {
-    garmentLabel: "Watch / Accessory",
+    garmentLabel: "Watch",
     name: "Gold Necklace Set",
     image: "/assets/generated/product-womens-jewelry.dim_400x500.jpg",
     gender: "women",
   },
   {
-    garmentLabel: "Bag / Purse",
+    garmentLabel: "Bag",
     name: "Leather Handbag",
     image: "/assets/generated/product-womens-bag.dim_400x500.jpg",
     gender: "women",
   },
   // ── Unisex: Jackets ──
   {
-    garmentLabel: "Jacket / Coat",
+    garmentLabel: "Jacket",
     name: "Navy Blazer",
     image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
     gender: "men",
   },
   {
-    garmentLabel: "Jacket / Coat",
+    garmentLabel: "Jacket",
     name: "Denim Jacket",
     image: "/assets/generated/product-unisex-jacket.dim_400x500.jpg",
     gender: "all",
   },
   // ── Ethnic ──
   {
-    garmentLabel: "Scarf / Dupatta",
+    garmentLabel: "Scarf",
     name: "Silk Dupatta",
     image: "/assets/generated/product-womens-saree.dim_400x500.jpg",
     gender: "women",
   },
   {
-    garmentLabel: "Scarf / Dupatta",
+    garmentLabel: "Scarf",
     name: "Cotton Scarf",
     image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
     gender: "men",
@@ -360,17 +356,27 @@ function buildRetailerUrl(
   garmentKeyword: string,
   colorName: string,
   moodKeyword?: string,
+  gender?: string,
 ): string {
   const moodSuffix = moodKeyword ? ` ${moodKeyword}` : "";
+  const genderPrefix =
+    gender === "female" ? "women" : gender === "male" ? "men" : "";
+  const gPrefix = genderPrefix ? `${genderPrefix} ` : "";
   const g = encodeURIComponent(garmentKeyword);
   const cn = encodeURIComponent(colorName);
-  const q = encodeURIComponent(`${garmentKeyword} ${colorName}${moodSuffix}`);
+  const q = encodeURIComponent(
+    `${gPrefix}${garmentKeyword} ${colorName}${moodSuffix}`,
+  );
+  const gk = encodeURIComponent(`${gPrefix}${garmentKeyword}`);
   switch (retailer) {
     case "amazon":
-      return `https://www.amazon.in/s?k=${g}+${cn}`;
+      return `https://www.amazon.in/s?k=${gk}+${cn}${genderPrefix ? "&rh=n%3A1571271031" : ""}`;
     case "flipkart":
-      return `https://www.flipkart.com/search?q=${g}+${cn}`;
+      return `https://www.flipkart.com/search?q=${gk}+${cn}`;
     case "myntra":
+      if (genderPrefix) {
+        return `https://www.myntra.com/${genderPrefix}-${g}?rawQuery=${q}`;
+      }
       return `https://www.myntra.com/${g}?rawQuery=${q}`;
     case "ajio":
       return `https://www.ajio.com/search/?text=${q}`;
@@ -1012,7 +1018,7 @@ function ProductCard({
 
   return (
     <motion.div
-      className="ios-card overflow-hidden flex-shrink-0"
+      className="ios-card creamy-card overflow-hidden flex-shrink-0"
       style={{ width: 160 }}
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
@@ -1093,10 +1099,7 @@ function ShopMatchingStyles({
   const [activeRetailerTab, setActiveRetailerTab] = useState(0);
 
   const shopColor = selectedMatchingColor ?? { hex: colorHex, name: colorName };
-  const complementaryLabels = COMPLEMENTARY_GARMENT_MAP[garment.label] ?? [
-    "Top / Shirt",
-    "Shoes / Footwear",
-  ];
+  const complementaryLabels = getComplementaryLabels(garment.label, userGender);
 
   const sections = complementaryLabels
     .map((label) => ({
@@ -1274,88 +1277,94 @@ function ShopMatchingStyles({
                 transition={{ type: "spring", stiffness: 380, damping: 32 }}
                 className="space-y-3"
               >
-                {sections.map((section, si) => {
+                {(() => {
                   const retailer = allRetailers[activeRetailerTab];
-                  const keyword =
-                    GARMENT_KEYWORD_MAP[section.label] ?? "clothing";
+                  const firstKeyword =
+                    GARMENT_KEYWORD_MAP[sections[0]?.label ?? ""] ?? "clothing";
                   return (
-                    <div key={section.label} className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">
-                          {section.garment!.emoji}
-                        </span>
-                        <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                          {section.label}
-                        </span>
-                        <div className="flex-1 h-px bg-border/40" />
-                      </div>
-                      <div
-                        className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-                        style={{ scrollbarWidth: "none" }}
-                      >
-                        {section.products.slice(0, 3).map((product, pi) => (
-                          <motion.div
-                            key={`${product.garmentLabel}-${pi}`}
-                            className="ios-card overflow-hidden flex-shrink-0"
-                            style={{ width: 150 }}
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{
-                              delay: (si * 3 + pi) * 0.05,
-                              type: "spring",
-                              stiffness: 350,
-                              damping: 28,
-                            }}
-                            data-ocid={`scanner.item.${si * 3 + pi + 1}`}
+                    <>
+                      {sections.map((section, si) => (
+                        <div key={section.label} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">
+                              {section.garment!.emoji}
+                            </span>
+                            <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                              {section.label}
+                            </span>
+                            <div className="flex-1 h-px bg-border/40" />
+                          </div>
+                          <div
+                            className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
+                            style={{ scrollbarWidth: "none" }}
                           >
-                            <div
-                              className="relative"
-                              style={{ aspectRatio: "4/5" }}
-                            >
-                              <PaletteIconCard
-                                garmentType={product.garmentLabel}
-                                hexColor={shopColor.hex}
-                              />
-                              <div
-                                className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5"
-                                style={{
-                                  backgroundColor: shopColor.hex,
-                                  boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                            {section.products.slice(0, 3).map((product, pi) => (
+                              <motion.div
+                                key={`${product.garmentLabel}-${pi}`}
+                                className="ios-card creamy-card overflow-hidden flex-shrink-0"
+                                style={{ width: 120 }}
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{
+                                  delay: (si * 3 + pi) * 0.05,
+                                  type: "spring",
+                                  stiffness: 350,
+                                  damping: 28,
                                 }}
+                                data-ocid={`scanner.item.${si * 3 + pi + 1}`}
                               >
-                                <div className="w-2.5 h-2.5 rounded-full bg-white/50" />
-                              </div>
-                            </div>
-                            <div className="p-2.5">
-                              <p className="text-xs font-semibold text-foreground leading-tight mb-2 line-clamp-2">
-                                {shopColor.name} {product.garmentLabel}
-                              </p>
-                              <a
-                                href={buildRetailerUrl(
-                                  retailer.key,
-                                  keyword,
-                                  shopColor.name,
-                                  moodKeyword,
-                                )}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={`block text-center text-[10px] font-bold rounded-xl py-1.5 text-white transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
-                                data-ocid="scanner.link"
-                              >
-                                Shop on {retailer.badge}
-                              </a>
-                              {sizeHint && (
-                                <span className="block text-center text-[9px] text-muted-foreground mt-1">
-                                  Size: {sizeHint}
-                                </span>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
+                                <div
+                                  className="relative"
+                                  style={{ aspectRatio: "4/5" }}
+                                >
+                                  <PaletteIconCard
+                                    garmentType={product.garmentLabel}
+                                    hexColor={shopColor.hex}
+                                  />
+                                  <div
+                                    className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5"
+                                    style={{
+                                      backgroundColor: shopColor.hex,
+                                      boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+                                    }}
+                                  >
+                                    <div className="w-2.5 h-2.5 rounded-full bg-white/50" />
+                                  </div>
+                                </div>
+                                <div className="p-2">
+                                  <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2">
+                                    {shopColor.name} {product.garmentLabel}
+                                  </p>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {/* ONE consolidated shop link per retailer tab */}
+                      <a
+                        href={buildRetailerUrl(
+                          retailer.key,
+                          firstKeyword,
+                          shopColor.name,
+                          moodKeyword,
+                          userGender,
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center justify-center gap-1.5 w-full text-[11px] font-bold rounded-xl py-2.5 text-white transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
+                        data-ocid="scanner.link"
+                      >
+                        Shop {shopColor.name} on {retailer.badge} →
+                      </a>
+                      {sizeHint && (
+                        <span className="block text-center text-[9px] text-muted-foreground">
+                          Suggested size: {sizeHint}
+                        </span>
+                      )}
+                    </>
                   );
-                })}
+                })()}
               </motion.div>
             </AnimatePresence>
           </motion.div>
@@ -1759,10 +1768,10 @@ function getAgeProfile(age: AgeCategory) {
     case "kid":
       return {
         allowedGarments: [
-          "Top / Shirt",
-          "Bottom / Pants",
-          "Shoes / Footwear",
-          "Bag / Purse",
+          "Top",
+          "Pant",
+          "Shoes",
+          "Bag",
           "Hoodie",
           "Shorts",
           "Jeans",
@@ -1774,12 +1783,12 @@ function getAgeProfile(age: AgeCategory) {
     case "teenage":
       return {
         allowedGarments: [
-          "Top / Shirt",
-          "Bottom / Pants",
-          "Jacket / Coat",
-          "Shoes / Footwear",
-          "Watch / Accessory",
-          "Bag / Purse",
+          "Top",
+          "Pant",
+          "Jacket",
+          "Shoes",
+          "Watch",
+          "Bag",
           "Hoodie",
           "Shorts",
           "Jeans",
@@ -1804,15 +1813,15 @@ function getAgeProfile(age: AgeCategory) {
     case "senior":
       return {
         allowedGarments: [
-          "Top / Shirt",
-          "Bottom / Pants",
-          "Kurta / Kurti",
-          "Saree / Ethnic Wear",
-          "Shoes / Footwear",
+          "Top",
+          "Pant",
+          "Kurta",
+          "Saree",
+          "Shoes",
           "Stole",
           "Ethnic Wear",
-          "Suit / Blazer",
-          "Watch / Accessory",
+          "Suit",
+          "Watch",
         ],
         sizeHint: "L/XL/XXL",
         excludeCategories: ["streetwear", "crop", "mini"],
@@ -2554,9 +2563,9 @@ export default function ScannerPage() {
                   if (selectedGender === "male") {
                     const femaleOnly = [
                       "Dress",
-                      "Saree / Ethnic Wear",
-                      "Bag / Purse",
-                      "Scarf / Dupatta",
+                      "Saree",
+                      "Bag",
+                      "Scarf",
                       "Skirt",
                       "Stole",
                       "Dupatta",
@@ -2564,7 +2573,7 @@ export default function ScannerPage() {
                     if (femaleOnly.includes(gt.label)) return false;
                   } else {
                     // female
-                    const maleOnly = ["Turban", "Suit / Blazer"];
+                    const maleOnly = ["Turban", "Suit"];
                     if (maleOnly.includes(gt.label) && selectedAge !== "young")
                       return false;
                   }
