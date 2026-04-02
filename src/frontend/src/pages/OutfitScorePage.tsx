@@ -15,34 +15,51 @@ import {
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import QRCode from "qrcode";
-
-// QR code generated locally using the qrcode package (no external HTTP calls, no CORS issues)
+// QR code generated via Google Charts API as a reliable fallback
 async function generateQRDataUrl(text: string, size = 120): Promise<string> {
-  try {
-    return await QRCode.toDataURL(text, {
-      width: size,
-      margin: 1,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
-      errorCorrectionLevel: "M",
-    });
-  } catch {
-    // Fallback: solid black square
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, size, size);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(4, 4, size - 8, size - 8);
-    }
-    return canvas.toDataURL("image/png");
-  }
+  return new Promise((resolve) => {
+    const encoded = encodeURIComponent(text);
+    const url = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encoded}&choe=UTF-8`;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (ctx) ctx.drawImage(img, 0, 0, size, size);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => {
+      // Fallback: draw a simple grid pattern
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = "#000000";
+        const cell = size / 10;
+        // Finder patterns top-left
+        ctx.fillRect(0, 0, 7 * cell, 7 * cell);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(cell, cell, 5 * cell, 5 * cell);
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(2 * cell, 2 * cell, 3 * cell, 3 * cell);
+        // Data pattern (simplified visual representation)
+        for (let i = 0; i < 10; i++) {
+          for (let j = 0; j < 10; j++) {
+            if ((i + j) % 2 === 0 && i > 7) {
+              ctx.fillRect(i * cell, j * cell, cell, cell);
+            }
+          }
+        }
+      }
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.src = url;
+  });
 }
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiTelegram, SiWhatsapp, SiX } from "react-icons/si";

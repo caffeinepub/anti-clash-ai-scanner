@@ -2,7 +2,10 @@ import { useCamera } from "@/camera/useCamera";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  CalendarDays,
   Camera,
+  ClipboardCopy,
+  Flame,
   Heart,
   Layers,
   LayoutGrid,
@@ -34,6 +37,7 @@ import {
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
   { label: "Top", emoji: "👕" },
+  { label: "T Shirt", emoji: "👕" },
   { label: "Shirt", emoji: "👔" },
   { label: "Blouse", emoji: "👚" },
   { label: "Pant", emoji: "👖" },
@@ -60,6 +64,7 @@ const GARMENT_TYPES = [
 
 const GARMENT_KEYWORD_MAP: Record<string, string> = {
   Top: "top",
+  "T Shirt": "t-shirt",
   Shirt: "shirt",
   Blouse: "blouse",
   Pant: "pant",
@@ -86,6 +91,7 @@ const GARMENT_KEYWORD_MAP: Record<string, string> = {
 
 const COMPLEMENTARY_GARMENT_MAP: Record<string, string[]> = {
   Top: ["Pant", "Jeans", "Bottom", "Shoes", "Watch", "Bag"],
+  "T Shirt": ["Pant", "Jeans", "Bottom", "Shorts", "Shoes", "Watch", "Bag"],
   Shirt: ["Pant", "Jeans", "Bottom", "Shoes", "Watch", "Bag"],
   Blouse: ["Saree", "Skirt", "Shoes", "Watch", "Bag"],
   Pant: ["Shirt", "Top", "Shoes", "Watch", "Bag"],
@@ -118,8 +124,8 @@ function getComplementaryLabels(
   const isFemale = gender === "female" || gender === "women";
   if (["Pant", "Bottom", "Jeans", "Shorts"].includes(garmentLabel)) {
     return isFemale
-      ? ["Shirt", "Top", "Blouse", "Shoes", "Watch", "Bag"]
-      : ["Shirt", "Top", "Shoes", "Watch", "Bag"];
+      ? ["Shirt", "T Shirt", "Top", "Blouse", "Shoes", "Watch", "Bag"]
+      : ["Shirt", "T Shirt", "Top", "Shoes", "Watch", "Bag"];
   }
   if (["Scarf", "Dupatta", "Stole"].includes(garmentLabel)) {
     return ["Top", "Blouse", "Dress", "Kurta", "Shoes"];
@@ -128,163 +134,6 @@ function getComplementaryLabels(
 }
 
 // ── Product catalog ────────────────────────────────────────────────────────
-interface ProductItem {
-  garmentLabel: string;
-  name: string;
-  image: string;
-  gender: "men" | "women" | "all";
-}
-
-const PRODUCT_CATALOG: ProductItem[] = [
-  // ── Men: Tops ──
-  {
-    garmentLabel: "Top",
-    name: "Classic White Shirt",
-    image: "/assets/generated/product-mens-shirt.dim_400x500.jpg",
-    gender: "men",
-  },
-  {
-    garmentLabel: "Top",
-    name: "Casual Grey T-Shirt",
-    image: "/assets/generated/product-mens-tshirt.dim_400x500.jpg",
-    gender: "men",
-  },
-  // ── Men: Bottoms ──
-  {
-    garmentLabel: "Pant",
-    name: "Chino Trousers",
-    image: "/assets/generated/product-mens-trousers.dim_400x500.jpg",
-    gender: "men",
-  },
-  {
-    garmentLabel: "Dress",
-    name: "Formal Trousers",
-    image: "/assets/generated/product-mens-trousers.dim_400x500.jpg",
-    gender: "men",
-  },
-  // ── Men: Shoes ──
-  {
-    garmentLabel: "Shoes",
-    name: "White Sneakers",
-    image: "/assets/generated/product-mens-shoes.dim_400x500.jpg",
-    gender: "men",
-  },
-  {
-    garmentLabel: "Shoes",
-    name: "Tan Loafers",
-    image: "/assets/generated/product-mens-loafers.dim_400x500.jpg",
-    gender: "men",
-  },
-  // ── Men: Accessories ──
-  {
-    garmentLabel: "Watch",
-    name: "Classic Watch",
-    image: "/assets/generated/product-mens-watch.dim_400x500.jpg",
-    gender: "men",
-  },
-  {
-    garmentLabel: "Bag",
-    name: "Messenger Bag",
-    image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
-    gender: "men",
-  },
-  // ── Women: Tops ──
-  {
-    garmentLabel: "Top",
-    name: "Floral Top",
-    image: "/assets/generated/product-womens-top.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Kurta",
-    name: "Embroidered Kurti",
-    image: "/assets/generated/product-womens-kurta.dim_400x500.jpg",
-    gender: "women",
-  },
-  // ── Women: Bottoms ──
-  {
-    garmentLabel: "Pant",
-    name: "Palazzo Pants",
-    image: "/assets/generated/product-womens-pants.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Dress",
-    name: "Silk Saree",
-    image: "/assets/generated/product-womens-saree.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Saree",
-    name: "Silk Saree",
-    image: "/assets/generated/product-womens-saree.dim_400x500.jpg",
-    gender: "women",
-  },
-  // ── Women: Shoes ──
-  {
-    garmentLabel: "Shoes",
-    name: "Stiletto Heels",
-    image: "/assets/generated/product-womens-heels.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Shoes",
-    name: "White Sneakers",
-    image: "/assets/generated/product-womens-sneakers.dim_400x500.jpg",
-    gender: "women",
-  },
-  // ── Women: Accessories ──
-  {
-    garmentLabel: "Watch",
-    name: "Gold Necklace Set",
-    image: "/assets/generated/product-womens-jewelry.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Bag",
-    name: "Leather Handbag",
-    image: "/assets/generated/product-womens-bag.dim_400x500.jpg",
-    gender: "women",
-  },
-  // ── Unisex: Jackets ──
-  {
-    garmentLabel: "Jacket",
-    name: "Navy Blazer",
-    image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
-    gender: "men",
-  },
-  {
-    garmentLabel: "Jacket",
-    name: "Denim Jacket",
-    image: "/assets/generated/product-unisex-jacket.dim_400x500.jpg",
-    gender: "all",
-  },
-  // ── Ethnic ──
-  {
-    garmentLabel: "Scarf",
-    name: "Silk Dupatta",
-    image: "/assets/generated/product-womens-saree.dim_400x500.jpg",
-    gender: "women",
-  },
-  {
-    garmentLabel: "Scarf",
-    name: "Cotton Scarf",
-    image: "/assets/generated/product-mens-jacket.dim_400x500.jpg",
-    gender: "men",
-  },
-];
-
-function getProductsForGarment(
-  garmentLabel: string,
-  userGender: string,
-): ProductItem[] {
-  const gender = userGender as "men" | "women" | "all";
-  return PRODUCT_CATALOG.filter(
-    (p) =>
-      p.garmentLabel === garmentLabel &&
-      (gender === "all" || p.gender === gender || p.gender === "all"),
-  );
-}
 
 // ── Retailer config ────────────────────────────────────────────────────────
 const RETAILERS = [
@@ -346,22 +195,34 @@ const RETAILERS = [
   },
 ];
 
-// Always return all 5 retailers
-function getAvailableRetailers(): typeof RETAILERS {
-  return RETAILERS;
-}
-
 function buildRetailerUrl(
   retailer: string,
   garmentKeyword: string,
   colorName: string,
   moodKeyword?: string,
   gender?: string,
+  age?: string,
 ): string {
   const moodSuffix = moodKeyword ? ` ${moodKeyword}` : "";
   const genderPrefix =
-    gender === "female" ? "women" : gender === "male" ? "men" : "";
-  const gPrefix = genderPrefix ? `${genderPrefix} ` : "";
+    gender === "female" || gender === "women"
+      ? "women"
+      : gender === "male" || gender === "men"
+        ? "men"
+        : "";
+  const ageSegment =
+    age === "kid"
+      ? " kids"
+      : age === "teenage"
+        ? " teen"
+        : age === "senior"
+          ? " senior"
+          : "";
+  const gPrefix = genderPrefix
+    ? `${genderPrefix}${ageSegment} `
+    : ageSegment
+      ? `${ageSegment.trim()} `
+      : "";
   const g = encodeURIComponent(garmentKeyword);
   const cn = encodeURIComponent(colorName);
   const q = encodeURIComponent(
@@ -370,7 +231,7 @@ function buildRetailerUrl(
   const gk = encodeURIComponent(`${gPrefix}${garmentKeyword}`);
   switch (retailer) {
     case "amazon":
-      return `https://www.amazon.in/s?k=${gk}+${cn}${genderPrefix ? "&rh=n%3A1571271031" : ""}`;
+      return `https://www.amazon.in/s?k=${gk}+${cn}${genderPrefix === "women" ? "&rh=n%3A1571271031" : genderPrefix === "men" ? "&rh=n%3A1968024031" : ""}`;
     case "flipkart":
       return `https://www.flipkart.com/search?q=${gk}+${cn}`;
     case "myntra":
@@ -383,7 +244,7 @@ function buildRetailerUrl(
     case "meesho":
       return `https://www.meesho.com/search?q=${q}`;
     case "nykaa":
-      return `https://www.nykaa.com/search/result/?q=${q}`;
+      return `https://www.nykaa.com/search/result/?q=${q}&root=true&searchType=Manual`;
     case "indya":
       return `https://www.houseofindya.com/Colourclash?q=${q}`;
     case "offduty":
@@ -663,15 +524,11 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 
 // ── Product Card ──────────────────────────────────────────────────────────
 // ── PaletteIconCard ──────────────────────────────────────────────────────
-interface PaletteIconCardProps {
-  garmentType: string;
-  hexColor: string;
-}
 
 function PaletteIconIcon({ cat }: { cat: string }) {
   const style: React.CSSProperties = {
-    width: "60%",
-    height: "60%",
+    width: "100%",
+    height: "100%",
     opacity: 0.9,
   };
   if (
@@ -988,97 +845,13 @@ function PaletteIconIcon({ cat }: { cat: string }) {
   );
 }
 
-function PaletteIconCard({ garmentType, hexColor }: PaletteIconCardProps) {
-  const cat = garmentType.toLowerCase();
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center"
-      style={{ background: hexColor }}
-    >
-      <PaletteIconIcon cat={cat} />
-    </div>
-  );
-}
-
-interface ProductCardProps {
-  product: ProductItem;
-  colorHex: string;
-  colorName: string;
-  index: number;
-}
-
-function ProductCard({
-  product,
-  colorHex,
-  colorName,
-  index,
-}: ProductCardProps) {
-  const keyword = GARMENT_KEYWORD_MAP[product.garmentLabel] ?? "clothing";
-  const availableRetailers = getAvailableRetailers();
-
-  return (
-    <motion.div
-      className="ios-card creamy-card overflow-hidden flex-shrink-0"
-      style={{ width: 160 }}
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{
-        delay: index * 0.06,
-        type: "spring",
-        stiffness: 350,
-        damping: 28,
-      }}
-      data-ocid={`scanner.item.${index + 1}`}
-    >
-      <div className="relative" style={{ aspectRatio: "4/5" }}>
-        <PaletteIconCard
-          garmentType={product.garmentLabel}
-          hexColor={colorHex}
-        />
-        {/* Color chip — shows selected palette color reliably on mobile */}
-        <div
-          className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5"
-          style={{
-            backgroundColor: colorHex,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
-          }}
-        >
-          <div className="w-2.5 h-2.5 rounded-full bg-white/50" />
-        </div>
-        <div
-          className="absolute bottom-0 left-0 right-0 h-8"
-          style={{ background: `linear-gradient(transparent, ${colorHex}60)` }}
-        />
-      </div>
-      <div className="p-2.5">
-        <p className="text-xs font-semibold text-foreground leading-tight mb-2 line-clamp-2">
-          {colorName} {product.garmentLabel}
-        </p>
-        <div className="flex flex-wrap gap-1">
-          {availableRetailers.map((retailer) => (
-            <a
-              key={retailer.key}
-              href={buildRetailerUrl(retailer.key, keyword, colorName)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`text-[8px] font-bold rounded-full px-1.5 py-0.5 transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
-              data-ocid="scanner.link"
-            >
-              {retailer.badge}
-            </a>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 // ── ShopMatchingStyles ─────────────────────────────────────────────────────
 interface ShopMatchingStylesProps {
   garment: (typeof GARMENT_TYPES)[0];
   colorHex: string;
   colorName: string;
   userGender: string;
+  selectedAge?: string;
   selectedMatchingColor: { hex: string; name: string } | null;
   allowedGarments?: string[];
   sizeHint?: string;
@@ -1090,14 +863,12 @@ function ShopMatchingStyles({
   colorHex,
   colorName,
   userGender,
+  selectedAge,
   selectedMatchingColor,
   allowedGarments,
   sizeHint,
   moodKeyword,
 }: ShopMatchingStylesProps) {
-  const [layoutMode, setLayoutMode] = useState<"accordion" | "tabs">("tabs");
-  const [activeRetailerTab, setActiveRetailerTab] = useState(0);
-
   const shopColor = selectedMatchingColor ?? { hex: colorHex, name: colorName };
   const complementaryLabels = getComplementaryLabels(garment.label, userGender);
 
@@ -1105,12 +876,9 @@ function ShopMatchingStyles({
     .map((label) => ({
       label,
       garment: GARMENT_TYPES.find((g) => g.label === label),
-      products: getProductsForGarment(label, userGender),
     }))
-    .filter((s) => s.garment && s.products.length > 0)
+    .filter((s) => s.garment !== undefined)
     .filter((s) => !allowedGarments || allowedGarments.includes(s.label));
-
-  const allRetailers = RETAILERS;
 
   if (sections.length === 0) {
     return (
@@ -1122,253 +890,135 @@ function ShopMatchingStyles({
     );
   }
 
-  const renderProductSections = () => (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={shopColor.hex}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        className="space-y-3"
-      >
-        {sections.map((section, si) => (
-          <motion.div
-            key={section.label}
-            className="space-y-2"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: si * 0.07,
-              type: "spring",
-              stiffness: 350,
-              damping: 28,
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-base">{section.garment!.emoji}</span>
-              <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                {section.label}
-              </span>
-              <div className="flex-1 h-px bg-border/40" />
-            </div>
-            <div
-              className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {section.products.map((product, pi) => (
-                <ProductCard
-                  key={`${product.garmentLabel}-${pi}-${shopColor.hex}`}
-                  product={product}
-                  colorHex={shopColor.hex}
-                  colorName={shopColor.name}
-                  index={si * 4 + pi}
-                />
-              ))}
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
-    </AnimatePresence>
-  );
-
   return (
-    <div className="space-y-3 p-4">
-      {/* Header row: color context + layout toggle */}
-      <div className="flex items-center gap-2">
+    <div className="p-4">
+      {/* Header row */}
+      <div className="flex items-center gap-2 mb-4">
         <div
-          className="w-4 h-4 rounded-full swatch-shadow flex-shrink-0"
-          style={{ backgroundColor: shopColor.hex }}
+          className="w-4 h-4 rounded-full flex-shrink-0"
+          style={{
+            backgroundColor: shopColor.hex,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
+          }}
         />
         <span className="text-xs text-muted-foreground flex-1">
-          Showing products for:{" "}
+          Matching colour:{" "}
           <span className="font-semibold text-foreground">
             {shopColor.name}
           </span>
         </span>
-        {/* Layout toggle */}
-        <div className="flex items-center gap-1 bg-muted rounded-xl p-0.5">
-          <button
-            type="button"
-            onClick={() => setLayoutMode("accordion")}
-            className={`p-1.5 rounded-lg transition-all ${
-              layoutMode === "accordion"
-                ? "bg-background shadow text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title="By garment type"
-            data-ocid="scanner.toggle"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setLayoutMode("tabs")}
-            className={`p-1.5 rounded-lg transition-all ${
-              layoutMode === "tabs"
-                ? "bg-background shadow text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title="By retailer"
-            data-ocid="scanner.toggle"
-          >
-            <Layers className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
 
+      {/* Card grid — 2 columns of compact tiles */}
       <AnimatePresence mode="wait">
-        {layoutMode === "accordion" ? (
-          <motion.div
-            key="accordion"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-          >
-            {renderProductSections()}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="tabs"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 10 }}
-            transition={{ type: "spring", stiffness: 380, damping: 32 }}
-            className="space-y-3"
-          >
-            {/* Retailer tabs */}
-            <div
-              className="flex gap-2 overflow-x-auto pb-1"
-              style={{ scrollbarWidth: "none" }}
-            >
-              {allRetailers.map((retailer, ri) => (
-                <button
-                  key={retailer.key}
-                  type="button"
-                  onClick={() => setActiveRetailerTab(ri)}
-                  className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all border ${
-                    activeRetailerTab === ri
-                      ? "text-white border-transparent shadow-sm"
-                      : "bg-muted text-muted-foreground border-border"
-                  }`}
-                  style={
-                    activeRetailerTab === ri
-                      ? {
-                          backgroundColor: retailer.color,
-                          borderColor: retailer.color,
-                        }
-                      : {}
-                  }
-                  data-ocid="scanner.tab"
-                >
-                  {retailer.badge}
-                </button>
-              ))}
-            </div>
-
-            {/* Active retailer content */}
-            <AnimatePresence mode="wait">
+        <motion.div
+          key={shopColor.hex + garment.label + userGender}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          className="grid grid-cols-2 gap-3"
+        >
+          {sections.map((section, si) => {
+            const keyword = GARMENT_KEYWORD_MAP[section.label] ?? "clothing";
+            return (
               <motion.div
-                key={activeRetailerTab + shopColor.hex}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                className="space-y-3"
+                key={section.label}
+                className="creamy-card overflow-hidden flex flex-col"
+                style={{
+                  borderRadius: 22,
+                  boxShadow: "0 8px 28px rgba(180,160,140,0.15)",
+                }}
+                initial={{ opacity: 0, y: 14, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{
+                  delay: si * 0.06,
+                  type: "spring",
+                  stiffness: 350,
+                  damping: 28,
+                }}
+                data-ocid={`scanner.item.${si + 1}`}
               >
-                {(() => {
-                  const retailer = allRetailers[activeRetailerTab];
-                  const firstKeyword =
-                    GARMENT_KEYWORD_MAP[sections[0]?.label ?? ""] ?? "clothing";
-                  return (
-                    <>
-                      {sections.map((section, si) => (
-                        <div key={section.label} className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">
-                              {section.garment!.emoji}
-                            </span>
-                            <span className="text-xs font-bold text-foreground uppercase tracking-wider">
-                              {section.label}
-                            </span>
-                            <div className="flex-1 h-px bg-border/40" />
-                          </div>
-                          <div
-                            className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1"
-                            style={{ scrollbarWidth: "none" }}
-                          >
-                            {section.products.slice(0, 3).map((product, pi) => (
-                              <motion.div
-                                key={`${product.garmentLabel}-${pi}`}
-                                className="ios-card creamy-card overflow-hidden flex-shrink-0"
-                                style={{ width: 120 }}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{
-                                  delay: (si * 3 + pi) * 0.05,
-                                  type: "spring",
-                                  stiffness: 350,
-                                  damping: 28,
-                                }}
-                                data-ocid={`scanner.item.${si * 3 + pi + 1}`}
-                              >
-                                <div
-                                  className="relative"
-                                  style={{ aspectRatio: "4/5" }}
-                                >
-                                  <PaletteIconCard
-                                    garmentType={product.garmentLabel}
-                                    hexColor={shopColor.hex}
-                                  />
-                                  <div
-                                    className="absolute top-1.5 right-1.5 flex items-center gap-1 rounded-full px-1.5 py-0.5"
-                                    style={{
-                                      backgroundColor: shopColor.hex,
-                                      boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
-                                    }}
-                                  >
-                                    <div className="w-2.5 h-2.5 rounded-full bg-white/50" />
-                                  </div>
-                                </div>
-                                <div className="p-2">
-                                  <p className="text-[10px] font-semibold text-foreground leading-tight line-clamp-2">
-                                    {shopColor.name} {product.garmentLabel}
-                                  </p>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      {/* ONE consolidated shop link per retailer tab */}
+                {/* Compact square colour tile */}
+                <div
+                  className="relative flex items-center justify-center"
+                  style={{
+                    aspectRatio: "1 / 1",
+                    background: shopColor.hex,
+                    borderRadius: "22px 22px 0 0",
+                  }}
+                >
+                  {/* Gradient overlay */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(160deg, rgba(255,255,255,0.22) 0%, rgba(0,0,0,0.12) 100%)",
+                      borderRadius: "22px 22px 0 0",
+                    }}
+                  />
+                  {/* Garment icon (large, centered) */}
+                  <div
+                    className="relative z-10 flex items-center justify-center"
+                    style={{ width: 72, height: 72 }}
+                  >
+                    <PaletteIconIcon cat={section.label.toLowerCase()} />
+                  </div>
+                  {/* Colour name pill — bottom of tile */}
+                  <div className="absolute bottom-2 left-0 right-0 flex justify-center">
+                    <span
+                      className="text-white font-bold text-[10px] tracking-wide uppercase bg-black/30 backdrop-blur-sm rounded-full px-2 py-0.5"
+                      style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+                    >
+                      {section.garment!.emoji} {section.label}
+                    </span>
+                  </div>
+                  {/* Colour hex chip — top-right */}
+                  <div className="absolute top-1.5 right-1.5 bg-black/25 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+                    <span className="text-white text-[8px] font-semibold">
+                      {shopColor.name}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Retailer buttons — compact pills */}
+                <div className="p-2 space-y-1.5">
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Shop →
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {RETAILERS.map((retailer) => (
                       <a
+                        key={retailer.key}
                         href={buildRetailerUrl(
                           retailer.key,
-                          firstKeyword,
+                          keyword,
                           shopColor.name,
                           moodKeyword,
                           userGender,
+                          selectedAge,
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`flex items-center justify-center gap-1.5 w-full text-[11px] font-bold rounded-xl py-2.5 text-white transition-opacity hover:opacity-80 ${retailer.badgeClass}`}
+                        className={`flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-[10px] font-bold text-white transition-opacity active:opacity-70 hover:opacity-90 ${retailer.badgeClass}`}
+                        style={{ backgroundColor: retailer.color }}
                         data-ocid="scanner.link"
                       >
-                        Shop {shopColor.name} on {retailer.badge} →
+                        <span>{retailer.badge}</span>
+                        <span className="text-[8px] opacity-80">→</span>
                       </a>
-                      {sizeHint && (
-                        <span className="block text-center text-[9px] text-muted-foreground">
-                          Suggested size: {sizeHint}
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
+                    ))}
+                    {sizeHint && (
+                      <p className="text-center text-[9px] text-muted-foreground mt-0.5">
+                        Size: <span className="font-semibold">{sizeHint}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
               </motion.div>
-            </AnimatePresence>
-          </motion.div>
-        )}
+            );
+          })}
+        </motion.div>
       </AnimatePresence>
     </div>
   );
@@ -1646,7 +1296,9 @@ function getColorOfDay() {
   return COLOR_OF_DAY_PALETTE[dayOfYear % COLOR_OF_DAY_PALETTE.length];
 }
 
-function ColorOfDayBanner() {
+function ColorOfDayBanner({
+  onTryColor,
+}: { onTryColor?: (hex: string, name: string) => void }) {
   const [dismissed, setDismissed] = useState(() => {
     const key = "colourClash_colorOfDay_date";
     return localStorage.getItem(key) === new Date().toDateString();
@@ -1702,6 +1354,23 @@ function ColorOfDayBanner() {
       </div>
       <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
       <div className="px-4 py-2.5">
+        {onTryColor && (
+          <button
+            type="button"
+            onClick={() => {
+              onTryColor(color.hex, color.name);
+              handleDismiss();
+            }}
+            className="mb-2 w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
+            style={{
+              background: `linear-gradient(135deg, ${color.hex}ee 0%, ${color.hex}99 100%)`,
+            }}
+            data-ocid="scanner.primary_button"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Try this color →
+          </button>
+        )}
         <p className="text-[10px] text-muted-foreground mb-2">
           Quick shop in {color.name}:
         </p>
@@ -1719,6 +1388,60 @@ function ColorOfDayBanner() {
             </a>
           ))}
         </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Style Streak Badge ───────────────────────────────────────────────────
+function StyleStreakBadge() {
+  const [streak, setStreak] = useState<number>(0);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const lastVisit = localStorage.getItem("cc_last_visit");
+    const currentStreak = Number(
+      localStorage.getItem("cc_style_streak") || "0",
+    );
+
+    if (lastVisit === today) {
+      setStreak(currentStreak);
+    } else {
+      const yesterday = new Date(Date.now() - 86400000)
+        .toISOString()
+        .slice(0, 10);
+      const newStreak = lastVisit === yesterday ? currentStreak + 1 : 1;
+      localStorage.setItem("cc_style_streak", String(newStreak));
+      localStorage.setItem("cc_last_visit", today);
+      setStreak(newStreak);
+    }
+  }, []);
+
+  const label =
+    streak >= 7
+      ? `🔥 ${streak}-day streak — Style Master!`
+      : streak >= 3
+        ? `🔥 ${streak}-day streak — You're on fire!`
+        : streak >= 2
+          ? `🔥 ${streak}-day streak — Keep it up!`
+          : "Welcome back! Start your streak 🔥";
+
+  return (
+    <motion.div
+      className="flex justify-center"
+      initial={{ scale: 0.7, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.15 }}
+    >
+      <div
+        className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-white text-[11px] font-bold shadow-md"
+        style={{
+          background: "linear-gradient(135deg, #FF6B35 0%, #FF9F1C 100%)",
+        }}
+        data-ocid="scanner.card"
+      >
+        <Flame className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>{label}</span>
       </div>
     </motion.div>
   );
@@ -1769,6 +1492,7 @@ function getAgeProfile(age: AgeCategory) {
       return {
         allowedGarments: [
           "Top",
+          "T Shirt",
           "Pant",
           "Shoes",
           "Bag",
@@ -1784,6 +1508,7 @@ function getAgeProfile(age: AgeCategory) {
       return {
         allowedGarments: [
           "Top",
+          "T Shirt",
           "Pant",
           "Jacket",
           "Shoes",
@@ -1814,6 +1539,7 @@ function getAgeProfile(age: AgeCategory) {
       return {
         allowedGarments: [
           "Top",
+          "T Shirt",
           "Pant",
           "Kurta",
           "Saree",
@@ -1884,7 +1610,13 @@ export default function ScannerPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { userProfile } = useUserProfile();
-  const userGender = userProfile?.gender ?? "all";
+  const filterGender =
+    selectedGender === "male"
+      ? "male"
+      : selectedGender === "female"
+        ? "female"
+        : null;
+  const userGender = filterGender ?? userProfile?.gender ?? "all";
   const ageProfile = getAgeProfile(selectedAge);
   const moodKeyword = getMoodKeyword(selectedMood, selectedOccasion);
 
@@ -1918,6 +1650,7 @@ export default function ScannerPage() {
     : [];
 
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
 
   useEffect(() => {
     detectedColorRef.current = detectedColor;
@@ -1957,6 +1690,28 @@ export default function ScannerPage() {
       setAiConnected(false);
     }
   }, [selectedAI]);
+
+  // Outfit Tip of the Day — show once per session on first lock
+  useEffect(() => {
+    if (!lockedColor) return;
+    const tipShown = sessionStorage.getItem("cc_tip_shown");
+    if (tipShown) return;
+    sessionStorage.setItem("cc_tip_shown", "1");
+    const family = getColorFamily(lockedColor);
+    const tips: Record<string, string> = {
+      warm: "Warm tones pair beautifully with camel, ivory, and gold accessories.",
+      cool: "Cool hues look stunning with silver jewelry and white sneakers.",
+      neutral:
+        "Neutrals are your canvas — add one bold accessory to elevate the look.",
+      dark: "Dark colors create slimming silhouettes. Try a light scarf for contrast.",
+      light:
+        "Light colors radiate freshness. Ground the look with tan leather shoes.",
+    };
+    const tipText =
+      tips[family] ??
+      "Layer this color with a neutral top for a complete outfit.";
+    toast("💡 Style Tip", { description: tipText, duration: 5000 });
+  }, [lockedColor]);
 
   const handleLockColor = useCallback(() => {
     if (lockedColor) {
@@ -2067,8 +1822,18 @@ export default function ScannerPage() {
     <div className="flex flex-col gap-5 pb-4">
       {/* ── Colour of the Day ── */}
       <AnimatePresence>
-        <ColorOfDayBanner />
+        <ColorOfDayBanner
+          onTryColor={(hex, name) => {
+            setLockedColor(hex);
+            setAdviceHex(hex);
+            setLocalAdvice(generateLocalHarmonyPalette(hex));
+            toast.success(`🎨 ${name} locked as today's color!`);
+          }}
+        />
       </AnimatePresence>
+
+      {/* ── Style Streak ── */}
+      <StyleStreakBadge />
 
       {/* ── Filters (Collapsible) ── */}
       <motion.div
@@ -2956,6 +2721,103 @@ export default function ScannerPage() {
           <p className="text-[10px] text-center text-muted-foreground/70 mt-1">
             Tap a color to refresh shop links
           </p>
+
+          {/* ✨ Quick Colour Palette Generator */}
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowPalette((v) => !v)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
+              style={{
+                background: "linear-gradient(135deg, #9966cc 0%, #483d8b 100%)",
+              }}
+              data-ocid="scanner.secondary_button"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {showPalette
+                ? "Hide Outfit Palette"
+                : "✨ Generate Full Outfit Palette"}
+            </button>
+
+            <AnimatePresence>
+              {showPalette &&
+                (() => {
+                  const [h, s, l] = hexToHsl(activeColor);
+                  const compHex = hslToHex((h + 180) % 360, s, l);
+                  const tri1Hex = hslToHex((h + 120) % 360, s, l);
+                  const tri2Hex = hslToHex((h + 240) % 360, s, l);
+                  const neutralHex = hslToHex(h, Math.max(0, s * 0.2), l);
+                  const swatches = [
+                    { hex: activeColor, label: "Primary" },
+                    { hex: compHex, label: "Complement" },
+                    { hex: tri1Hex, label: "Triadic 1" },
+                    { hex: tri2Hex, label: "Triadic 2" },
+                    { hex: neutralHex, label: "Neutral" },
+                  ];
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 340,
+                        damping: 30,
+                      }}
+                      className="overflow-hidden"
+                    >
+                      <div className="creamy-card mt-2 p-3">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                            Your Outfit Palette
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const hexList = swatches
+                                .map((s) => s.hex)
+                                .join(", ");
+                              navigator.clipboard
+                                .writeText(hexList)
+                                .then(() =>
+                                  toast.success("Palette copied! ✨"),
+                                );
+                            }}
+                            className="flex items-center gap-1 text-[9px] font-semibold text-primary hover:opacity-70 transition-opacity"
+                            data-ocid="scanner.secondary_button"
+                          >
+                            <ClipboardCopy className="w-3 h-3" />
+                            Copy Palette
+                          </button>
+                        </div>
+                        <div className="flex justify-between gap-1">
+                          {swatches.map((sw) => (
+                            <div
+                              key={sw.hex}
+                              className="flex flex-col items-center gap-1 flex-1"
+                            >
+                              <div
+                                className="w-10 h-10 rounded-full border-2 border-white/30 shadow-md flex-shrink-0"
+                                style={{
+                                  backgroundColor: sw.hex,
+                                  boxShadow: `0 2px 8px ${sw.hex}55`,
+                                }}
+                              />
+                              <span className="text-[8px] text-muted-foreground font-medium text-center leading-tight line-clamp-2">
+                                {sw.label}
+                              </span>
+                              <span className="text-[7px] font-mono text-muted-foreground/70">
+                                {getColorName(sw.hex)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+            </AnimatePresence>
+          </div>
         </div>
       </motion.div>
       <AnimatePresence>
@@ -2998,6 +2860,7 @@ export default function ScannerPage() {
               colorHex={activeColor}
               colorName={colorName}
               userGender={userGender}
+              selectedAge={selectedAge}
               selectedMatchingColor={selectedMatchingColor}
               allowedGarments={ageProfile.allowedGarments}
               sizeHint={ageProfile.sizeHint}
