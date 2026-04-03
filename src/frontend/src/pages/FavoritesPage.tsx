@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2 } from "lucide-react";
+import { Copy, Download, Loader2, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -1061,6 +1061,1251 @@ function StyleDNACard() {
   );
 }
 
+// ─── Creamy card style helper ──────────────────────────────────────────────
+const creamyCard = {
+  background: "rgba(255,255,255,0.40)",
+  backdropFilter: "blur(25px) saturate(180%)",
+  WebkitBackdropFilter: "blur(25px) saturate(180%)",
+  borderRadius: "28px",
+  border: "1.5px solid rgba(255,255,255,0.15)",
+  boxShadow: "0 10px 40px rgba(180,160,140,0.12)",
+};
+
+// ─── Color Personality Quiz ───────────────────────────────────────────────
+const QUIZ_ROUNDS = [
+  {
+    round: 1,
+    q: "Which colour speaks to you?",
+    a: { color: "#F5C842", name: "Golden", label: "Warm & Golden" },
+    b: { color: "#4A90D9", name: "Ocean Blue", label: "Cool & Ocean" },
+  },
+  {
+    round: 2,
+    q: "Pick your vibe:",
+    a: { color: "#C8B9A2", name: "Linen", label: "Soft Linen" },
+    b: { color: "#E8472A", name: "Coral", label: "Vivid Coral" },
+  },
+  {
+    round: 3,
+    q: "Your signature shade:",
+    a: { color: "#1A1A2E", name: "Midnight", label: "Deep Midnight" },
+    b: { color: "#F0EEE4", name: "Ivory", label: "Pure Ivory" },
+  },
+];
+
+const PERSONALITY_MAP: Record<
+  string,
+  { name: string; emoji: string; desc: string; colors: string[] }
+> = {
+  WWW: {
+    name: "Classic Minimalist",
+    emoji: "🤍",
+    desc: "You love clean, timeless elegance. Every piece you wear is intentional and refined.",
+    colors: ["#F5C842", "#C8B9A2", "#1A1A2E"],
+  },
+  WWC: {
+    name: "Soft Romantic",
+    emoji: "🌸",
+    desc: "Warm and approachable, you choose comfort over chaos. Softness is your superpower.",
+    colors: ["#F5C842", "#C8B9A2", "#F0EEE4"],
+  },
+  WCW: {
+    name: "Urban Explorer",
+    emoji: "🏙️",
+    desc: "You balance neutrals with unexpected pops. City streets are your runway.",
+    colors: ["#F5C842", "#E8472A", "#1A1A2E"],
+  },
+  WCC: {
+    name: "Boho Spirit",
+    emoji: "🌻",
+    desc: "Free-flowing, earthy, naturally stylish. You dress like you have somewhere magical to be.",
+    colors: ["#F5C842", "#E8472A", "#F0EEE4"],
+  },
+  CWW: {
+    name: "Bold Visionary",
+    emoji: "🔥",
+    desc: "You lead with colour and command attention. No muted tones allowed.",
+    colors: ["#4A90D9", "#C8B9A2", "#1A1A2E"],
+  },
+  CWC: {
+    name: "Dark Romantic",
+    emoji: "🖤",
+    desc: "Mysterious, intense, deeply expressive. You find beauty in the shadows.",
+    colors: ["#4A90D9", "#C8B9A2", "#F0EEE4"],
+  },
+  CCW: {
+    name: "Street Icon",
+    emoji: "🧢",
+    desc: "Edgy, trend-forward, you set the rules. Others follow your style.",
+    colors: ["#4A90D9", "#E8472A", "#1A1A2E"],
+  },
+  CCC: {
+    name: "Maximalist",
+    emoji: "💥",
+    desc: "More is more. You are the look. Every outfit is a statement.",
+    colors: ["#4A90D9", "#E8472A", "#F0EEE4"],
+  },
+};
+
+function ColorPersonalityQuiz() {
+  const stored = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("cc_color_personality") || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const [picks, setPicks] = useState<string[]>([]);
+  const [result, setResult] = useState<(typeof PERSONALITY_MAP)[string] | null>(
+    stored,
+  );
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const currentRound = picks.length;
+  const done = picks.length === 3;
+
+  const pick = (choice: "W" | "C") => {
+    const newPicks = [...picks, choice];
+    setPicks(newPicks);
+    if (newPicks.length === 3) {
+      const key = newPicks.join("");
+      const p = PERSONALITY_MAP[key] ?? PERSONALITY_MAP.CCC;
+      setResult(p);
+      localStorage.setItem("cc_color_personality", JSON.stringify(p));
+    }
+  };
+
+  const reset = () => {
+    setPicks([]);
+    setResult(null);
+    setShareImageUrl(null);
+    localStorage.removeItem("cc_color_personality");
+  };
+
+  const buildShareCard = async () => {
+    if (!result) return;
+    setSharing(true);
+    try {
+      const W = 800;
+      const H = 900;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Background
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, "#0d0d1a");
+      bg.addColorStop(1, "#1a0d2e");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Top label
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "bold 20px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("YOUR COLOUR PERSONALITY", W / 2, 60);
+
+      // Emoji
+      ctx.font = "80px system-ui";
+      ctx.fillText(result.emoji, W / 2, 170);
+
+      // Personality name
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 52px system-ui";
+      ctx.fillText(result.name, W / 2, 260);
+
+      // Description (wrapped)
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "22px system-ui";
+      const words = result.desc.split(" ");
+      const lines: string[] = [];
+      let line = "";
+      for (const w of words) {
+        const t = line ? `${line} ${w}` : w;
+        if (ctx.measureText(t).width > 680 && line) {
+          lines.push(line);
+          line = w;
+        } else line = t;
+      }
+      if (line) lines.push(line);
+      lines.forEach((l, i) => ctx.fillText(l, W / 2, 330 + i * 34));
+
+      // Color swatches
+      const swatchY = 500;
+      result.colors.forEach((c, i) => {
+        const sx = W / 2 - 120 + i * 120;
+        ctx.beginPath();
+        ctx.arc(sx, swatchY, 44, 0, Math.PI * 2);
+        ctx.fillStyle = c;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      });
+
+      // Divider
+      ctx.fillStyle = "rgba(255,215,0,0.25)";
+      ctx.fillRect(60, 580, W - 120, 1);
+
+      // Branding
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 26px system-ui";
+      ctx.fillText("COLOUR CLASH", W / 2, 640);
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "16px system-ui";
+      ctx.fillText("colourclash-emb.caffeine.xyz", W / 2, 672);
+
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.font = "15px system-ui";
+      ctx.fillText(
+        "What's your colour personality? Scan to find out! 🎨",
+        W / 2,
+        710,
+      );
+
+      const caption = `I'm a ${result.name} ${result.emoji} according to Colour Clash! What's your colour personality? Find out at https://colourclash-emb.caffeine.xyz/ #ColourClash #ColourPersonality`;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          setSharing(false);
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        setShareImageUrl(url);
+        const file = new File([blob], "colour-personality.png", {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: "My Colour Personality",
+              text: caption,
+            });
+            setSharing(false);
+            return;
+          } catch {
+            /* fallthrough */
+          }
+        }
+        setShowModal(true);
+        setSharing(false);
+      }, "image/png");
+    } catch {
+      toast.error("Could not build personality card");
+      setSharing(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 28 }}
+      style={{ ...creamyCard, marginBottom: 20, padding: 20 }}
+      data-ocid="favorites.card"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🎨</span>
+        <div>
+          <p className="text-sm font-bold" style={{ color: "#3d2a0e" }}>
+            Colour Personality Quiz
+          </p>
+          <p className="text-xs" style={{ color: "#9c7a58" }}>
+            3 rounds · discover your style type
+          </p>
+        </div>
+      </div>
+
+      {!done ? (
+        <div>
+          <p
+            className="text-xs font-semibold mb-1"
+            style={{ color: "#9c7a58" }}
+          >
+            Round {currentRound + 1} of 3
+          </p>
+          <div className="w-full bg-amber-100/50 rounded-full h-1.5 mb-4">
+            <div
+              className="h-1.5 rounded-full transition-all"
+              style={{
+                width: `${(currentRound / 3) * 100}%`,
+                background: "#c47a2e",
+              }}
+            />
+          </div>
+          <p
+            className="text-sm font-semibold mb-4 text-center"
+            style={{ color: "#3d2a0e" }}
+          >
+            {QUIZ_ROUNDS[currentRound].q}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {(["a", "b"] as const).map((side) => {
+              const opt = QUIZ_ROUNDS[currentRound][side];
+              return (
+                <button
+                  key={side}
+                  type="button"
+                  onClick={() => pick(side === "a" ? "W" : "C")}
+                  className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all active:scale-95"
+                  style={{
+                    borderColor: opt.color,
+                    background: `${opt.color}22`,
+                  }}
+                  data-ocid="favorites.toggle"
+                >
+                  <div
+                    className="w-14 h-14 rounded-full shadow-lg"
+                    style={{
+                      background: opt.color,
+                      border: `3px solid ${opt.color}`,
+                    }}
+                  />
+                  <span
+                    className="text-xs font-semibold"
+                    style={{ color: "#3d2a0e" }}
+                  >
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : result ? (
+        <div className="text-center">
+          <div className="text-5xl mb-2">{result.emoji}</div>
+          <p className="text-xl font-black mb-1" style={{ color: "#3d2a0e" }}>
+            {result.name}
+          </p>
+          <p
+            className="text-xs mb-4 leading-relaxed"
+            style={{ color: "#9c7a58" }}
+          >
+            {result.desc}
+          </p>
+          <div className="flex justify-center gap-3 mb-4">
+            {result.colors.map((c) => (
+              <div
+                key={c}
+                className="w-10 h-10 rounded-full shadow-md border-2"
+                style={{ background: c, borderColor: "rgba(255,255,255,0.6)" }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={buildShareCard}
+              disabled={sharing}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+              style={{ background: "#c47a2e" }}
+              data-ocid="favorites.primary_button"
+            >
+              {sharing ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />{" "}
+                  Generating...
+                </>
+              ) : (
+                "✨ Share My Personality"
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold border"
+              style={{ borderColor: "#d4b896", color: "#9c7a58" }}
+              data-ocid="favorites.secondary_button"
+            >
+              Retake
+            </button>
+          </div>
+          {shareImageUrl && (
+            <div className="mt-3 rounded-xl overflow-hidden border border-amber-200/40">
+              <img
+                src={shareImageUrl}
+                alt="Personality card"
+                className="w-full object-contain"
+              />
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* Share modal */}
+      <AnimatePresence>
+        {showModal && shareImageUrl && result && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowModal(false)}
+            data-ocid="favorites.modal"
+          >
+            <div
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="w-full bg-black flex items-center justify-center"
+                style={{ maxHeight: "50vh", overflow: "hidden" }}
+              >
+                <img
+                  src={shareImageUrl}
+                  alt="Personality card"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "50vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = shareImageUrl;
+                      a.download = "colour-personality.png";
+                      a.click();
+                      toast.success("Downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const caption = `I'm a ${result.name} ${result.emoji} according to Colour Clash! What's your colour personality? https://colourclash-emb.caffeine.xyz/ #ColourClash`;
+                      navigator.clipboard
+                        .writeText(caption)
+                        .then(() => toast.success("Copied!"))
+                        .catch(() => {});
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Caption
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="favorites.close_button"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Outfit Repeat Tracker ────────────────────────────────────────────────
+interface LBEntry {
+  score: number;
+  date: string;
+  result?: { dominantColor?: string } | null;
+}
+function getLookbookFav(): LBEntry[] {
+  try {
+    const raw = localStorage.getItem("cc_lookbook");
+    return raw ? (JSON.parse(raw) as LBEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function OutfitRepeatTracker() {
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const entries = getLookbookFav();
+
+  if (entries.length < 2) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ ...creamyCard, marginBottom: 20, padding: 20 }}
+        data-ocid="favorites.card"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">🔄</span>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#3d2a0e" }}>
+              Outfit Repeat Tracker
+            </p>
+            <p className="text-xs" style={{ color: "#9c7a58" }}>
+              Track your go-to colours
+            </p>
+          </div>
+        </div>
+        <p
+          className="text-xs text-center py-6"
+          style={{ color: "#9c7a58", fontStyle: "italic" }}
+        >
+          Scan more outfits to unlock your Repeat Tracker! 🎨
+        </p>
+      </motion.div>
+    );
+  }
+
+  // Gather color names from entries
+  const colorCounts: Record<string, number> = {};
+  for (const e of entries) {
+    const c = e.result?.dominantColor ?? "Unknown";
+    colorCounts[c] = (colorCounts[c] ?? 0) + 1;
+  }
+  const sorted = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+  const topColors = sorted.slice(0, 3);
+  const mostWorn = topColors[0]?.[0] ?? "Unknown";
+  const mostWornCount = topColors[0]?.[1] ?? 0;
+  const uniqueCount = Object.keys(colorCounts).length;
+  const hasRepeat = mostWornCount >= 3;
+  const badge = hasRepeat
+    ? "Repeat Offender 🔄"
+    : "Fresh Look ✨ — You never repeat!";
+
+  // Helper: color hex from name (rough)
+  const nameToHex = (name: string) => {
+    const map: Record<string, string> = {
+      "Sky Blue": "#87CEEB",
+      "Navy Blue": "#000080",
+      White: "#FFFFFF",
+      Black: "#0d0d1a",
+      Crimson: "#DC143C",
+      Maroon: "#800000",
+      "Sage Green": "#8FBC8F",
+      Olive: "#808000",
+      Unknown: "#C8B9A2",
+    };
+    return (
+      map[name] ??
+      `#${Math.abs(
+        name.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 0) % 0xffffff,
+      )
+        .toString(16)
+        .padStart(6, "8")}`
+    );
+  };
+
+  const buildShareCard = async () => {
+    setSharing(true);
+    try {
+      const W = 800;
+      const H = 600;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, "#0a0a1a");
+      bg.addColorStop(1, "#1a120a");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = "#FFD700";
+      ctx.fillRect(0, 0, W, 5);
+
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "bold 22px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("MY OUTFIT TRACKER", W / 2, 56);
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 42px system-ui";
+      ctx.fillText(`${uniqueCount} unique colour combos`, W / 2, 120);
+
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "22px system-ui";
+      ctx.fillText(`Most worn: ${mostWorn}`, W / 2, 165);
+
+      // 3 color circles
+      topColors.forEach(([name], i) => {
+        const cx = W / 2 - 120 + i * 120;
+        const cy = 260;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 44, 0, Math.PI * 2);
+        ctx.fillStyle = nameToHex(name);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "13px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(name.slice(0, 12), cx, cy + 62);
+      });
+
+      // Badge
+      ctx.fillStyle = hasRepeat ? "#E8472A" : "#22c55e";
+      const bw = ctx.measureText(badge).width + 40;
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - bw / 2, 360, bw, 44, 22);
+      ctx.fill();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 18px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(badge, W / 2, 387);
+
+      // Branding
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.fillRect(0, H - 50, W, 50);
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 18px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText("COLOUR CLASH", 24, H - 18);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "13px system-ui";
+      ctx.textAlign = "right";
+      ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
+
+      const caption = `I've worn ${uniqueCount} unique colour combos! My go-to is ${mostWorn}. ${badge} — Check my style report on Colour Clash! #ColourClash
+
+https://colourclash-emb.caffeine.xyz/`;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          setSharing(false);
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        setShareImageUrl(url);
+        const file = new File([blob], "outfit-tracker.png", {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: "My Outfit Tracker",
+              text: caption,
+            });
+            setSharing(false);
+            return;
+          } catch {
+            /* fallthrough */
+          }
+        }
+        setShowModal(true);
+        setSharing(false);
+      }, "image/png");
+    } catch {
+      toast.error("Could not build tracker card");
+      setSharing(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ ...creamyCard, marginBottom: 20, padding: 20 }}
+      data-ocid="favorites.card"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">🔄</span>
+        <div>
+          <p className="text-sm font-bold" style={{ color: "#3d2a0e" }}>
+            Outfit Repeat Tracker
+          </p>
+          <p className="text-xs" style={{ color: "#9c7a58" }}>
+            Your colour wearing patterns
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div
+          className="rounded-2xl p-3 text-center"
+          style={{ background: "rgba(196,122,46,0.12)" }}
+        >
+          <p className="text-2xl font-black" style={{ color: "#c47a2e" }}>
+            {uniqueCount}
+          </p>
+          <p className="text-[10px]" style={{ color: "#9c7a58" }}>
+            Unique Combos
+          </p>
+        </div>
+        <div
+          className="rounded-2xl p-3 text-center"
+          style={{ background: "rgba(196,122,46,0.12)" }}
+        >
+          <p
+            className="text-sm font-bold truncate"
+            style={{ color: "#c47a2e" }}
+          >
+            {mostWorn}
+          </p>
+          <p className="text-[10px]" style={{ color: "#9c7a58" }}>
+            Most Worn Color
+          </p>
+        </div>
+      </div>
+
+      {topColors.length > 0 && (
+        <div className="flex justify-center gap-4 mb-4">
+          {topColors.map(([name]) => (
+            <div key={name} className="flex flex-col items-center gap-1">
+              <div
+                className="w-10 h-10 rounded-full shadow border-2"
+                style={{
+                  background: nameToHex(name),
+                  borderColor: "rgba(255,255,255,0.5)",
+                }}
+              />
+              <span
+                className="text-[9px] text-center max-w-[52px] truncate"
+                style={{ color: "#9c7a58" }}
+              >
+                {name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className="text-center rounded-xl py-2 mb-4 text-xs font-bold"
+        style={{
+          background: hasRepeat
+            ? "rgba(232,71,42,0.15)"
+            : "rgba(34,197,94,0.15)",
+          color: hasRepeat ? "#E8472A" : "#16a34a",
+        }}
+      >
+        {badge}
+      </div>
+
+      <button
+        type="button"
+        onClick={buildShareCard}
+        disabled={sharing}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+        style={{ background: "#c47a2e" }}
+        data-ocid="favorites.primary_button"
+      >
+        {sharing ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />{" "}
+            Generating...
+          </>
+        ) : (
+          "📊 Share My Style Report"
+        )}
+      </button>
+
+      {shareImageUrl && (
+        <div className="mt-3 rounded-xl overflow-hidden border border-amber-200/40">
+          <img
+            src={shareImageUrl}
+            alt="Tracker report"
+            className="w-full object-contain"
+          />
+        </div>
+      )}
+
+      {/* Share modal */}
+      <AnimatePresence>
+        {showModal && shareImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowModal(false)}
+            data-ocid="favorites.modal"
+          >
+            <div
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="w-full bg-black flex items-center justify-center"
+                style={{ maxHeight: "45vh", overflow: "hidden" }}
+              >
+                <img
+                  src={shareImageUrl}
+                  alt="Tracker"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "45vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = shareImageUrl!;
+                      a.download = "outfit-tracker.png";
+                      a.click();
+                      toast.success("Downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(
+                          `I've worn ${uniqueCount} unique colour combos! My go-to is ${mostWorn}. #ColourClash https://colourclash-emb.caffeine.xyz/`,
+                        )
+                        .then(() => toast.success("Copied!"))
+                        .catch(() => {});
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Caption
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="favorites.close_button"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// ─── Weekly Style Report ──────────────────────────────────────────────────
+function WeeklyStyleReport() {
+  const [shareImageUrl, setShareImageUrl] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - 6);
+
+  const allEntries = getLookbookFav();
+  const weekEntries = allEntries.filter((e) => {
+    try {
+      return new Date(e.date) >= weekStart;
+    } catch {
+      return false;
+    }
+  });
+
+  if (weekEntries.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{ ...creamyCard, marginBottom: 20, padding: 20 }}
+        data-ocid="favorites.card"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-2xl">📅</span>
+          <div>
+            <p className="text-sm font-bold" style={{ color: "#3d2a0e" }}>
+              Weekly Style Report
+            </p>
+            <p className="text-xs" style={{ color: "#9c7a58" }}>
+              Your 7-day style journey
+            </p>
+          </div>
+        </div>
+        <p
+          className="text-xs text-center py-6"
+          style={{ color: "#9c7a58", fontStyle: "italic" }}
+        >
+          No outfits scored this week yet. Start your style journey! 🚀
+        </p>
+      </motion.div>
+    );
+  }
+
+  const scores = weekEntries.map((e) => e.score);
+  const avgScore = Math.round(
+    scores.reduce((a, b) => a + b, 0) / scores.length,
+  );
+  const highScore = Math.max(...scores);
+  const highEntry = weekEntries.find((e) => e.score === highScore);
+  const highDay = highEntry
+    ? new Date(highEntry.date).toLocaleDateString("en-US", { weekday: "short" })
+    : "-";
+
+  const colorCounts: Record<string, number> = {};
+  for (const e of weekEntries) {
+    const c = e.result?.dominantColor ?? "Unknown";
+    colorCounts[c] = (colorCounts[c] ?? 0) + 1;
+  }
+  const mostCommon =
+    Object.entries(colorCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "Unknown";
+
+  const trend =
+    avgScore > 75
+      ? "Style Master Week 🏆"
+      : avgScore >= 60
+        ? "Strong Style Week 💪"
+        : "Keep Experimenting Week 🌱";
+  const quote =
+    avgScore > 75
+      ? "You're on fire this week! Keep setting the bar high."
+      : avgScore >= 60
+        ? "Solid week of style choices — you're levelling up!"
+        : "Every outfit is a learning. Keep experimenting boldly!";
+
+  const nameToHex = (name: string) => {
+    const map: Record<string, string> = {
+      "Sky Blue": "#87CEEB",
+      "Navy Blue": "#000080",
+      White: "#FFFFFF",
+      Black: "#0d0d1a",
+      Crimson: "#DC143C",
+      Maroon: "#800000",
+      "Sage Green": "#8FBC8F",
+      Olive: "#808000",
+      Unknown: "#C8B9A2",
+    };
+    return (
+      map[name] ??
+      `#${Math.abs(
+        name.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 0) % 0xffffff,
+      )
+        .toString(16)
+        .padStart(6, "8")}`
+    );
+  };
+
+  const buildShareCard = async () => {
+    setSharing(true);
+    try {
+      const W = 800;
+      const H = 1000;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, "#0a0d1a");
+      bg.addColorStop(1, "#0a1a0d");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = "#FFD700";
+      ctx.fillRect(0, 0, W, 5);
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 30px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("MY WEEKLY STYLE REPORT", W / 2, 60);
+
+      const dateRange = `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "16px system-ui";
+      ctx.fillText(dateRange, W / 2, 88);
+
+      // Stats grid
+      const stats = [
+        { label: "Outfits Scored", value: String(weekEntries.length) },
+        { label: "Highest Score", value: `${highScore} (${highDay})` },
+        { label: "Average Score", value: String(avgScore) },
+        { label: "Top Colour", value: mostCommon },
+      ];
+      stats.forEach((s, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const bx = col === 0 ? 50 : W / 2 + 20;
+        const by = 130 + row * 130;
+        const bw = W / 2 - 70;
+        const bh = 110;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 16);
+        ctx.fill();
+        ctx.fillStyle = "#FFD700";
+        ctx.font = "bold 32px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(s.value.slice(0, 16), bx + bw / 2, by + 52);
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.font = "14px system-ui";
+        ctx.fillText(s.label, bx + bw / 2, by + 80);
+      });
+
+      // Most worn color swatch
+      const swatchCy = 520;
+      ctx.beginPath();
+      ctx.arc(W / 2, swatchCy, 50, 0, Math.PI * 2);
+      ctx.fillStyle = nameToHex(mostCommon);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "16px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(mostCommon, W / 2, swatchCy + 72);
+
+      // Trend badge
+      ctx.fillStyle =
+        avgScore > 75 ? "#FFD700" : avgScore >= 60 ? "#22c55e" : "#60a5fa";
+      ctx.font = "bold 26px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(trend, W / 2, 650);
+
+      // Quote
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.font = "italic 18px system-ui";
+      ctx.fillText(quote, W / 2, 690);
+
+      // Bottom branding
+      ctx.fillStyle = "rgba(0,0,0,0.78)";
+      ctx.fillRect(0, H - 50, W, 50);
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 18px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText("COLOUR CLASH", 24, H - 18);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "13px system-ui";
+      ctx.textAlign = "right";
+      ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
+
+      const caption = `My weekly style report: ${weekEntries.length} outfits, avg score ${avgScore}/100! ${trend} 🎨 #ColourClash
+
+https://colourclash-emb.caffeine.xyz/`;
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          setSharing(false);
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        setShareImageUrl(url);
+        const file = new File([blob], "weekly-style-report.png", {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: "My Weekly Style Report",
+              text: caption,
+            });
+            setSharing(false);
+            return;
+          } catch {
+            /* fallthrough */
+          }
+        }
+        setShowModal(true);
+        setSharing(false);
+      }, "image/png");
+    } catch {
+      toast.error("Could not build weekly report");
+      setSharing(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{ ...creamyCard, marginBottom: 20, padding: 20 }}
+      data-ocid="favorites.card"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">📅</span>
+        <div>
+          <p className="text-sm font-bold" style={{ color: "#3d2a0e" }}>
+            Weekly Style Report
+          </p>
+          <p className="text-xs" style={{ color: "#9c7a58" }}>
+            {weekStart.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}{" "}
+            – Today
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        {[
+          { label: "Outfits", value: weekEntries.length },
+          { label: "Best Score", value: highScore },
+          { label: "Avg Score", value: avgScore },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl p-2.5 text-center"
+            style={{ background: "rgba(196,122,46,0.10)" }}
+          >
+            <p className="text-xl font-black" style={{ color: "#c47a2e" }}>
+              {s.value}
+            </p>
+            <p className="text-[9px]" style={{ color: "#9c7a58" }}>
+              {s.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="flex items-center gap-3 rounded-xl p-3 mb-4"
+        style={{ background: "rgba(196,122,46,0.10)" }}
+      >
+        <div
+          className="w-10 h-10 rounded-full flex-shrink-0 border-2"
+          style={{
+            background: nameToHex(mostCommon),
+            borderColor: "rgba(255,255,255,0.4)",
+          }}
+        />
+        <div>
+          <p className="text-xs font-bold" style={{ color: "#3d2a0e" }}>
+            Top Colour This Week
+          </p>
+          <p className="text-sm font-black" style={{ color: "#c47a2e" }}>
+            {mostCommon}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="text-center rounded-xl py-2 mb-4 text-xs font-bold"
+        style={{ background: "rgba(196,122,46,0.12)", color: "#c47a2e" }}
+      >
+        {trend}
+      </div>
+
+      <button
+        type="button"
+        onClick={buildShareCard}
+        disabled={sharing}
+        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+        style={{ background: "#c47a2e" }}
+        data-ocid="favorites.primary_button"
+      >
+        {sharing ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />{" "}
+            Generating...
+          </>
+        ) : (
+          "📤 Share My Weekly Report"
+        )}
+      </button>
+
+      {shareImageUrl && (
+        <div className="mt-3 rounded-xl overflow-hidden border border-amber-200/40">
+          <img
+            src={shareImageUrl}
+            alt="Weekly report"
+            className="w-full object-contain"
+          />
+        </div>
+      )}
+
+      {/* Share modal */}
+      <AnimatePresence>
+        {showModal && shareImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowModal(false)}
+            data-ocid="favorites.modal"
+          >
+            <div
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="w-full bg-black flex items-center justify-center"
+                style={{ maxHeight: "50vh", overflow: "hidden" }}
+              >
+                <img
+                  src={shareImageUrl}
+                  alt="Weekly report"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "50vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = shareImageUrl!;
+                      a.download = "weekly-style-report.png";
+                      a.click();
+                      toast.success("Downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(
+                          `My weekly style report: ${weekEntries.length} outfits, avg ${avgScore}/100! ${trend} #ColourClash https://colourclash-emb.caffeine.xyz/`,
+                        )
+                        .then(() => toast.success("Copied!"))
+                        .catch(() => {});
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="favorites.secondary_button"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Caption
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="favorites.close_button"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 export default function FavoritesPage(_props?: {
   onNavigate?: (tab: string) => void;
 }) {
@@ -1385,6 +2630,15 @@ export default function FavoritesPage(_props?: {
 
         {/* ── Style DNA Report ── */}
         <StyleDNACard />
+
+        {/* ── Color Personality Quiz ── */}
+        <ColorPersonalityQuiz />
+
+        {/* ── Outfit Repeat Tracker ── */}
+        <OutfitRepeatTracker />
+
+        {/* ── Weekly Style Report ── */}
+        <WeeklyStyleReport />
 
         {/* ── Camera scanner section ── */}
         <div

@@ -707,205 +707,772 @@ function ColorClashBattle({
   const [showBattle, setShowBattle] = useState(false);
   const [battleImageUrl, setBattleImageUrl] = useState<string | null>(null);
   const [battleCaption, setBattleCaption] = useState("");
+  const [showBattleModal, setShowBattleModal] = useState(false);
+
+  const handleShareBattle = async (blob: Blob) => {
+    const caption = battleCaption;
+    const file = new File([blob], "colour-clash-battle.png", {
+      type: "image/png",
+    });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: "Colour Clash Battle",
+          text: caption,
+        });
+        return;
+      } catch {
+        // fallthrough to modal
+      }
+    }
+    setShowBattleModal(true);
+  };
 
   const buildBattleCard = async () => {
+    const W = 1080;
+    const H = 600;
     const canvas = document.createElement("canvas");
-    canvas.width = 800;
-    canvas.height = 600;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Background
+    // Dark background
     ctx.fillStyle = "#0d0d1a";
-    ctx.fillRect(0, 0, 800, 600);
+    ctx.fillRect(0, 0, W, H);
 
-    // Left panel — photo or color block
-    if (photoDataUrl) {
-      await new Promise<void>((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(0, 0, 480, 600);
-          ctx.clip();
-          ctx.drawImage(img, 0, 0, 480, 600);
-          ctx.restore();
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = photoDataUrl;
-      });
-    } else {
-      const grad = ctx.createLinearGradient(0, 0, 480, 600);
-      grad.addColorStop(0, "#9966cc");
-      grad.addColorStop(1, "#483d8b");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 480, 600);
+    // Get challenger from lookbook (most recent entry with different score)
+    let challengerEntry: { photoDataUrl: string; score: number } | null = null;
+    try {
+      const raw = localStorage.getItem("cc_lookbook");
+      if (raw) {
+        const entries = JSON.parse(raw) as Array<{
+          photoDataUrl: string;
+          score: number;
+        }>;
+        challengerEntry =
+          entries.find((e) => e.score !== score) ?? entries[1] ?? null;
+      }
+    } catch {
+      /* ignore */
     }
 
-    // Dark overlay on left
-    const leftOverlay = ctx.createLinearGradient(0, 0, 480, 0);
-    leftOverlay.addColorStop(0, "rgba(0,0,0,0.2)");
-    leftOverlay.addColorStop(1, "rgba(0,0,0,0.7)");
-    ctx.fillStyle = leftOverlay;
-    ctx.fillRect(0, 0, 480, 600);
+    // Helper: draw a photo into a panel rect (cover fit)
+    const drawPanel = async (
+      dataUrl: string | null,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      fallbackGrad: [string, string],
+    ) => {
+      if (dataUrl) {
+        await new Promise<void>((res) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x, y, w, h);
+            ctx.clip();
+            const ir = img.naturalWidth / img.naturalHeight;
+            const cr = w / h;
+            let sx = 0;
+            let sy = 0;
+            let sw = img.naturalWidth;
+            let sh = img.naturalHeight;
+            if (ir > cr) {
+              sw = img.naturalHeight * cr;
+              sx = (img.naturalWidth - sw) / 2;
+            } else {
+              sh = img.naturalWidth / cr;
+              sy = (img.naturalHeight - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+            ctx.restore();
+            res();
+          };
+          img.onerror = () => res();
+          img.src = dataUrl;
+        });
+      } else {
+        const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+        grad.addColorStop(0, fallbackGrad[0]);
+        grad.addColorStop(1, fallbackGrad[1]);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, w, h);
+      }
+    };
 
-    // Score badge on photo
+    // Left panel: Challenger
+    await drawPanel(challengerEntry?.photoDataUrl ?? null, 0, 0, 540, H, [
+      "#9966cc",
+      "#483d8b",
+    ]);
+    // Right panel: Current user
+    await drawPanel(photoDataUrl, 540, 0, 540, H, ["#1a3a5c", "#0d1a2e"]);
+
+    // Dark overlays for text readability
+    ctx.fillStyle = "rgba(0,0,0,0.50)";
+    ctx.fillRect(0, 0, 540, H);
+    ctx.fillStyle = "rgba(0,0,0,0.50)";
+    ctx.fillRect(540, 0, 540, H);
+
+    // Winner/loser logic
+    const challengerScore = challengerEntry?.score ?? 0;
+    const challengerWins = challengerScore > score;
+    const userWins = score > challengerScore;
+    const isTie = challengerEntry && score === challengerScore;
+
+    // Dim the loser panel further
+    if (!isTie && challengerEntry) {
+      ctx.fillStyle = "rgba(0,0,0,0.30)";
+      if (challengerWins) ctx.fillRect(540, 0, 540, H);
+      else ctx.fillRect(0, 0, 540, H);
+    }
+
+    // CHALLENGER label
+    ctx.fillStyle = "rgba(200,160,255,0.95)";
+    ctx.font = "bold 24px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("CHALLENGER", 270, 46);
+
+    // YOUR SCORE label
+    ctx.fillStyle = "rgba(135,206,235,0.95)";
+    ctx.font = "bold 24px system-ui";
+    ctx.fillText("YOUR SCORE", 810, 46);
+
+    // Score badge helper
+    const drawScoreBadge = (cx: number, cy: number, s: number) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 58, 0, Math.PI * 2);
+      ctx.fillStyle = "#87CEEB";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 44px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(String(s), cx, cy + 8);
+      ctx.font = "bold 14px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillText("/100", cx, cy + 30);
+    };
+
+    if (challengerEntry) {
+      drawScoreBadge(270, 110, challengerScore);
+    } else {
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "18px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Be the first!", 270, 300);
+      ctx.font = "14px system-ui";
+      ctx.fillText("Share to challenge friends", 270, 330);
+    }
+    drawScoreBadge(810, 110, score);
+
+    // Winner crown
+    if (!isTie && challengerEntry) {
+      ctx.font = "34px system-ui";
+      ctx.textAlign = "center";
+      if (challengerWins) {
+        ctx.fillText("👑 WINNER", 270, H - 72);
+      } else if (userWins) {
+        ctx.fillText("👑 WINNER", 810, H - 72);
+      }
+    } else if (isTie) {
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 22px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("🤝 IT'S A TIE!", 540, H - 72);
+    } else if (!challengerEntry) {
+      // No challenger yet
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 20px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("👑 WINNER — CAN YOU BEAT THIS?", 810, H - 72);
+    }
+
+    // VS badge (center)
     ctx.beginPath();
-    ctx.arc(380, 80, 55, 0, Math.PI * 2);
-    ctx.fillStyle = "#87CEEB";
+    ctx.arc(540, H / 2, 44, 0, Math.PI * 2);
+    ctx.fillStyle = "#DC143C";
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.strokeStyle = "#FFD700";
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 42px Arial";
+    ctx.font = "bold 28px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(String(score), 380, 96);
+    ctx.fillText("VS", 540, H / 2 + 10);
 
-    // Right panel
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    ctx.fillRect(480, 0, 320, 600);
-
-    // VS badge
-    ctx.beginPath();
-    ctx.arc(480, 300, 36, 0, Math.PI * 2);
-    ctx.fillStyle = "#DC143C";
-    ctx.fill();
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 22px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("VS", 480, 308);
-
-    // Right panel text
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 56px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(String(score), 640, 240);
-    ctx.font = "bold 16px Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.fillText("/100", 640, 265);
-
-    ctx.fillStyle = "#87CEEB";
-    ctx.font = "bold 18px Arial";
-    ctx.fillText(`CAN YOU BEAT ${score}?`, 640, 320);
-
+    // Bottom strip
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(0, H - 50, W, 50);
     ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 20px Arial";
-    ctx.fillText("COLOUR CLASH", 640, 400);
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    ctx.font = "13px Arial";
-    ctx.fillText("colourclash-emb.caffeine.xyz", 640, 425);
+    ctx.font = "bold 18px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText("COLOUR CLASH", 24, H - 18);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "13px system-ui";
+    ctx.textAlign = "right";
+    ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
 
-    const caption = `I just scored ${score}/100 on Colour Clash! Think you can beat me? Scan the QR code to try! ⚔️ #ColourClash #ColorClashBattle`;
+    const caption = `I just scored ${score}/100 on Colour Clash! Think you can beat me? ⚔️ #ColourClash #ColorClashBattle\n\nhttps://colourclash-emb.caffeine.xyz/`;
     setBattleCaption(caption);
     navigator.clipboard.writeText(caption).catch(() => {});
 
-    canvas.toBlob((blob) => {
+    canvas.toBlob(async (blob) => {
       if (!blob) return;
-      if (battleImageUrl) URL.revokeObjectURL(battleImageUrl);
-      setBattleImageUrl(URL.createObjectURL(blob));
+      setBattleImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      await handleShareBattle(blob);
     }, "image/png");
   };
 
   if (score === 0) return null;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 340, damping: 28 }}
-      className="mt-4 bg-card border border-border/30 rounded-2xl p-4"
-      data-ocid="score.card"
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-lg">
-          ⚔️
-        </div>
-        <div>
-          <p className="text-sm font-bold text-foreground">
-            Color Clash Battle
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Challenge a friend — dare them to beat your score!
-          </p>
-        </div>
-      </div>
-
-      {!showBattle ? (
-        <button
-          type="button"
-          onClick={() => {
-            setShowBattle(true);
-            buildBattleCard();
-          }}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 hover:opacity-90"
-          style={{
-            background: "linear-gradient(135deg, #DC143C 0%, #8B0000 100%)",
-          }}
-          data-ocid="score.primary_button"
-        >
-          ⚔️ Generate Battle Card
-        </button>
-      ) : (
-        <div className="space-y-3">
-          {battleImageUrl && (
-            <div className="rounded-xl overflow-hidden border border-border/30">
-              <img
-                src={battleImageUrl}
-                alt="Battle card"
-                className="w-full object-contain"
-              />
-            </div>
-          )}
-          {battleCaption && (
-            <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
-              {battleCaption}
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (!battleImageUrl) return;
-                const a = document.createElement("a");
-                a.href = battleImageUrl;
-                a.download = "colour-clash-battle.png";
-                a.click();
-                toast.success("Battle card downloaded!");
-              }}
-              className="flex items-center justify-center gap-2 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-              data-ocid="score.secondary_button"
-            >
-              <Download className="w-4 h-4" /> Download
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard
-                  .writeText(battleCaption)
-                  .then(() => toast.success("Caption copied!"))
-                  .catch(() => {});
-              }}
-              className="flex items-center justify-center gap-2 py-2 rounded-xl bg-muted text-foreground text-sm font-semibold"
-              data-ocid="score.secondary_button"
-            >
-              <Copy className="w-4 h-4" /> Copy Caption
-            </button>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 340, damping: 28 }}
+        className="mt-4 bg-card border border-border/30 rounded-2xl p-4"
+        data-ocid="score.card"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-lg">
+            ⚔️
           </div>
-          <a
-            href={`https://wa.me/?text=${encodeURIComponent(battleCaption)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-sm font-semibold"
-            style={{ background: "#25D366" }}
-            data-ocid="score.link"
-          >
-            <SiWhatsapp className="w-4 h-4" /> Share Battle on WhatsApp
-          </a>
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              Color Clash Battle
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Challenge a friend — dare them to beat your score!
+            </p>
+          </div>
         </div>
-      )}
-    </motion.div>
+
+        {!showBattle ? (
+          <button
+            type="button"
+            onClick={() => {
+              setShowBattle(true);
+              buildBattleCard();
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 hover:opacity-90"
+            style={{
+              background: "linear-gradient(135deg, #DC143C 0%, #8B0000 100%)",
+            }}
+            data-ocid="score.primary_button"
+          >
+            ⚔️ Generate Battle Card
+          </button>
+        ) : (
+          <div className="space-y-3">
+            {battleImageUrl ? (
+              <div className="rounded-xl overflow-hidden border border-border/30">
+                <img
+                  src={battleImageUrl}
+                  alt="Battle card"
+                  className="w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground text-sm">
+                <Loader2 className="w-5 h-5 animate-spin" /> Building battle
+                card...
+              </div>
+            )}
+            {battleCaption && (
+              <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
+                {battleCaption}
+              </div>
+            )}
+            {battleImageUrl && (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = battleImageUrl!;
+                    a.download = "colour-clash-battle.png";
+                    a.click();
+                    toast.success("Battle card downloaded!");
+                  }}
+                  className="flex items-center justify-center gap-2 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                  data-ocid="score.secondary_button"
+                >
+                  <Download className="w-4 h-4" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard
+                      .writeText(battleCaption)
+                      .then(() => toast.success("Caption copied!"))
+                      .catch(() => {});
+                  }}
+                  className="flex items-center justify-center gap-2 py-2 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                  data-ocid="score.secondary_button"
+                >
+                  <Copy className="w-4 h-4" /> Copy Caption
+                </button>
+              </div>
+            )}
+            {battleImageUrl && (
+              <button
+                type="button"
+                onClick={() => setShowBattleModal(true)}
+                className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-sm font-semibold"
+                style={{ background: "#25D366" }}
+                data-ocid="score.share.button"
+              >
+                <SiWhatsapp className="w-4 h-4" /> Share Battle on WhatsApp
+              </button>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Battle share modal (desktop fallback) */}
+      <AnimatePresence>
+        {showBattleModal && battleImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowBattleModal(false)}
+            data-ocid="score.modal"
+          >
+            <div
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="w-full bg-black flex items-center justify-center"
+                style={{ maxHeight: "50vh", overflow: "hidden" }}
+              >
+                <img
+                  src={battleImageUrl}
+                  alt="Battle card"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "50vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-xs text-muted-foreground text-center">
+                  Save the image below, then share it on WhatsApp or any
+                  platform!
+                </p>
+                <div className="bg-muted rounded-xl p-3 text-xs text-foreground leading-relaxed">
+                  {battleCaption}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = battleImageUrl!;
+                      a.download = "colour-clash-battle.png";
+                      a.click();
+                      toast.success("Downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="score.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(battleCaption)
+                        .then(() => toast.success("Caption copied!"))
+                        .catch(() => {});
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="score.secondary_button"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Caption
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBattleModal(false)}
+                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="score.close_button"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ---- Clash Leaderboard Invite Component -----------------------------------
+function ClashLeaderboardInvite({
+  score,
+  photoDataUrl,
+}: {
+  score: number;
+  photoDataUrl: string | null;
+}) {
+  const [friendName, setFriendName] = useState("");
+  const [inviteImageUrl, setInviteImageUrl] = useState<string | null>(null);
+  const [inviteCaption, setInviteCaption] = useState("");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [building, setBuilding] = useState(false);
+
+  const getUserName = () => {
+    try {
+      const p = JSON.parse(localStorage.getItem("cc_profile") || "{}");
+      return p.name || "A Friend";
+    } catch {
+      return "A Friend";
+    }
+  };
+
+  const buildInviteCard = async () => {
+    if (!friendName.trim()) {
+      toast.error("Please enter your friend's name");
+      return;
+    }
+    setBuilding(true);
+    try {
+      const W = 800;
+      const H = 600;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const userName = getUserName();
+
+      // Background
+      const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+      bgGrad.addColorStop(0, "#0a0a1a");
+      bgGrad.addColorStop(1, "#1a0a2e");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Gold accent bar top
+      ctx.fillStyle = "#FFD700";
+      ctx.fillRect(0, 0, W, 6);
+
+      // Photo on right
+      if (photoDataUrl) {
+        await new Promise<void>((res) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(W - 240, 50, 190, 260, 16);
+            ctx.clip();
+            ctx.drawImage(img, W - 240, 50, 190, 260);
+            ctx.restore();
+            // Border
+            ctx.strokeStyle = "#FFD700";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.roundRect(W - 240, 50, 190, 260, 16);
+            ctx.stroke();
+            res();
+          };
+          img.onerror = () => res();
+          img.src = photoDataUrl;
+        });
+      }
+
+      // Challenge text
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 28px system-ui";
+      ctx.textAlign = "left";
+      const maxTW = W - 270;
+      const line1 = `${friendName.trim()},`;
+      const line2 = "Can you beat";
+      const line3 = `${userName}'s score?`;
+      ctx.fillText(line1, 40, 90);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 24px system-ui";
+      ctx.fillText(line2, 40, 130);
+      ctx.fillStyle = "#87CEEB";
+      ctx.font = `bold ${Math.min(24, Math.floor(maxTW / (line3.length * 0.6)))}px system-ui`;
+      ctx.fillText(line3, 40, 164);
+
+      // Score circle
+      ctx.beginPath();
+      ctx.arc(130, 290, 80, 0, Math.PI * 2);
+      ctx.fillStyle = "#87CEEB";
+      ctx.fill();
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 56px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(String(score), 130, 302);
+      ctx.font = "bold 18px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillText("/100", 130, 328);
+
+      // Grade
+      const grade =
+        score >= 90
+          ? "S"
+          : score >= 80
+            ? "A"
+            : score >= 70
+              ? "B"
+              : score >= 60
+                ? "C"
+                : score >= 50
+                  ? "D"
+                  : "F";
+      const gradeLabel =
+        score >= 90
+          ? "Style Master"
+          : score >= 80
+            ? "Great Look"
+            : score >= 70
+              ? "Good Combo"
+              : score >= 60
+                ? "Average"
+                : score >= 50
+                  ? "Needs Work"
+                  : "Bold Clash";
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 28px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText(`${grade} — ${gradeLabel}`, 240, 270);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "15px system-ui";
+      ctx.fillText("Tap QR code to start your challenge!", 240, 302);
+
+      // QR code
+      const qrDataUrl = await generateQRDataUrl(
+        "https://colourclash-emb.caffeine.xyz",
+        120,
+      );
+      await new Promise<void>((res) => {
+        const qrImg = new Image();
+        qrImg.onload = () => {
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.roundRect(240, 320, 132, 132, 8);
+          ctx.fill();
+          ctx.drawImage(qrImg, 246, 326, 120, 120);
+          res();
+        };
+        qrImg.onerror = () => res();
+        qrImg.src = qrDataUrl;
+      });
+
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "12px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText("Scan to play", 248, 468);
+
+      // Bottom strip
+      ctx.fillStyle = "rgba(0,0,0,0.75)";
+      ctx.fillRect(0, H - 48, W, 48);
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 18px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText("COLOUR CLASH", 24, H - 18);
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.font = "13px system-ui";
+      ctx.textAlign = "right";
+      ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
+
+      const caption = `${friendName.trim()}, ${userName} just scored ${score}/100 on Colour Clash! Think you can beat that? Scan the QR code to try! 🎯 #ColourClash
+
+https://colourclash-emb.caffeine.xyz/`;
+      setInviteCaption(caption);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        setInviteImageUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+        const file = new File([blob], "colour-clash-invite.png", {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: "Colour Clash Challenge",
+              text: caption,
+            });
+            setBuilding(false);
+            return;
+          } catch {
+            /* fallthrough */
+          }
+        }
+        setShowInviteModal(true);
+        setBuilding(false);
+      }, "image/png");
+    } catch (err) {
+      console.error("Invite card error:", err);
+      toast.error("Could not build invite card");
+      setBuilding(false);
+    }
+  };
+
+  if (score === 0) return null;
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 340, damping: 28 }}
+        className="mt-4 bg-card border border-border/30 rounded-2xl p-4"
+        data-ocid="score.card"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-lg">
+            🏆
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              Challenge a Friend
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Generate a personalised challenge card
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={friendName}
+            onChange={(e) => setFriendName(e.target.value)}
+            placeholder="Enter your friend's name..."
+            className="flex-1 px-3 py-2 text-sm rounded-xl bg-muted text-foreground border border-border/30 outline-none focus:ring-2 focus:ring-primary/40"
+            data-ocid="score.input"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") buildInviteCard();
+            }}
+          />
+          <button
+            type="button"
+            onClick={buildInviteCard}
+            disabled={building}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+              color: "#000",
+            }}
+            data-ocid="score.primary_button"
+          >
+            {building ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "🚀 Generate"
+            )}
+          </button>
+        </div>
+        {inviteImageUrl && (
+          <div className="mt-3 rounded-xl overflow-hidden border border-border/30">
+            <img
+              src={inviteImageUrl}
+              alt="Invite card"
+              className="w-full object-contain"
+            />
+          </div>
+        )}
+      </motion.div>
+
+      {/* Invite share modal */}
+      <AnimatePresence>
+        {showInviteModal && inviteImageUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowInviteModal(false)}
+            data-ocid="score.modal"
+          >
+            <div
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="w-full bg-black flex items-center justify-center"
+                style={{ maxHeight: "45vh", overflow: "hidden" }}
+              >
+                <img
+                  src={inviteImageUrl}
+                  alt="Invite card"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "45vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="bg-muted rounded-xl p-3 text-xs text-foreground leading-relaxed">
+                  {inviteCaption}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = inviteImageUrl!;
+                      a.download = "colour-clash-invite.png";
+                      a.click();
+                      toast.success("Downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="score.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(inviteCaption)
+                        .then(() => toast.success("Caption copied!"))
+                        .catch(() => {});
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="score.secondary_button"
+                  >
+                    <Copy className="w-4 h-4" /> Copy Caption
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
+                  data-ocid="score.close_button"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -2261,6 +2828,12 @@ ${APP_LINK}`);
 
         {/* ⚔️ Color Clash Battle */}
         <ColorClashBattle
+          score={currentEntry?.score ?? 0}
+          photoDataUrl={currentEntry?.photoDataUrl ?? null}
+        />
+
+        {/* 🏆 Challenge a Friend */}
+        <ClashLeaderboardInvite
           score={currentEntry?.score ?? 0}
           photoDataUrl={currentEntry?.photoDataUrl ?? null}
         />
