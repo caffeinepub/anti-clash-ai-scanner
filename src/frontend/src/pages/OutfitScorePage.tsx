@@ -696,76 +696,219 @@ function LoadingPulse({ label }: { label: string }) {
 
 // ---- Share Image Helper ---------------------------------------------------
 
-// ---- Color Clash Battle Component ----------------------------------------
-function ColorClashBattle({
+// ---- Score Celebration Component -----------------------------------------
+function ScoreCelebration({
+  score,
+  onDismiss,
+}: {
+  score: number;
+  onDismiss: () => void;
+}) {
+  useEffect(() => {
+    const delay = score === 100 ? 4000 : score >= 85 ? 3000 : 2500;
+    const timer = setTimeout(onDismiss, delay);
+    return () => clearTimeout(timer);
+  }, [score, onDismiss]);
+
+  const hearts = Array.from({ length: 24 }, (_, i) => i);
+
+  const getTheme = () => {
+    if (score === 100) {
+      return {
+        bg: "linear-gradient(135deg, #ff6b9d 0%, #ff4576 50%, #c0392b 100%)",
+        emoji: "💯",
+        title: "PERFECT SCORE!",
+        subtitle: "💖 You are absolutely flawless!",
+        fullScreen: true,
+        hearts: true,
+      };
+    }
+    if (score >= 95) {
+      return {
+        bg: "linear-gradient(135deg, #f7d700 0%, #f5a623 100%)",
+        emoji: "👑",
+        title: "Elite Stylist!",
+        subtitle: "You are fashion royalty — incredible look!",
+        fullScreen: true,
+        hearts: false,
+      };
+    }
+    if (score >= 90) {
+      return {
+        bg: "linear-gradient(135deg, #11cdd4 0%, #0d9488 100%)",
+        emoji: "💎",
+        title: "Outstanding!",
+        subtitle: "Gem-level style — people will stare!",
+        fullScreen: true,
+        hearts: false,
+      };
+    }
+    if (score >= 85) {
+      return {
+        bg: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+        emoji: "🔥",
+        title: "Style Master!",
+        subtitle: "You're on fire — absolutely stunning outfit!",
+        fullScreen: true,
+        hearts: false,
+      };
+    }
+    if (score >= 80) {
+      return {
+        bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+        emoji: "🌟",
+        title: "Impressive!",
+        subtitle: "Stand-out style — great colour choices!",
+        fullScreen: false,
+        hearts: false,
+      };
+    }
+    if (score >= 75) {
+      return {
+        bg: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+        emoji: "✨",
+        title: "Great Style!",
+        subtitle: "You've got the look — nice coordination!",
+        fullScreen: false,
+        hearts: false,
+      };
+    }
+    return {
+      bg: "linear-gradient(135deg, #eab308 0%, #ca8a04 100%)",
+      emoji: "🎉",
+      title: "Nice Outfit!",
+      subtitle: "Solid colour choices — keep it up!",
+      fullScreen: false,
+      hearts: false,
+    };
+  };
+
+  const theme = getTheme();
+
+  if (theme.fullScreen) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: "rgba(0,0,0,0.75)" }}
+        onClick={onDismiss}
+        data-ocid="score.modal"
+      >
+        {/* Floating hearts for score 100 */}
+        {theme.hearts &&
+          hearts.map((i) => (
+            <motion.div
+              key={i}
+              className="fixed pointer-events-none select-none"
+              style={{
+                left: `${5 + (i % 12) * 8}%`,
+                bottom: "-10%",
+                fontSize: `${24 + Math.floor(i % 3) * 12}px`,
+                zIndex: 60,
+              }}
+              initial={{ y: 0, opacity: 1 }}
+              animate={{ y: "-120vh", opacity: 0 }}
+              transition={{
+                duration: 3 + (i % 3) * 0.5,
+                delay: (i % 8) * 0.2,
+                ease: "easeOut",
+              }}
+            >
+              {i % 3 === 0 ? "💖" : i % 3 === 1 ? "❤️" : "💕"}
+            </motion.div>
+          ))}
+
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          className="relative mx-4 rounded-3xl p-8 text-center shadow-2xl max-w-sm w-full"
+          style={{ background: theme.bg }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <div className="text-6xl mb-3">{theme.emoji}</div>
+          <h2 className="text-2xl font-black text-white mb-2">{theme.title}</h2>
+          <p className="text-white/90 text-sm font-medium mb-4">
+            {theme.subtitle}
+          </p>
+          <div
+            className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4"
+            style={{ background: "rgba(255,255,255,0.25)" }}
+          >
+            <span className="text-white font-black text-3xl">{score}</span>
+          </div>
+          <p className="text-white/70 text-xs">Tap anywhere to continue</p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // Toast-style card for 70-84
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 80, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 80, scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 380, damping: 22 }}
+      className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-80 rounded-2xl p-5 text-center shadow-2xl"
+      style={{ background: theme.bg }}
+      onClick={onDismiss}
+      data-ocid="score.toast"
+    >
+      <div className="text-4xl mb-2">{theme.emoji}</div>
+      <h3 className="text-lg font-black text-white">{theme.title}</h3>
+      <p className="text-white/85 text-sm mt-1">{theme.subtitle}</p>
+      <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5">
+        <span className="text-white font-bold text-lg">{score}/100</span>
+      </div>
+    </motion.div>
+  );
+}
+
+// ---- BattleField Component ------------------------------------------------
+function BattleField({
   score,
   photoDataUrl,
+  isBattleMode,
 }: {
   score: number;
   photoDataUrl: string | null;
+  isBattleMode: boolean;
 }) {
-  const [showBattle, setShowBattle] = useState(false);
-  const [battleImageUrl, setBattleImageUrl] = useState<string | null>(null);
+  const [battleStarted, setBattleStarted] = useState(false);
+  const [challengeCardUrl, setChallengeCardUrl] = useState<string | null>(null);
   const [battleCaption, setBattleCaption] = useState("");
-  const [showBattleModal, setShowBattleModal] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [vsCardUrl, setVsCardUrl] = useState<string | null>(null);
+  const [vsResult, setVsResult] = useState<"win" | "lose" | "tie" | null>(null);
+  const [showVsModal, setShowVsModal] = useState(false);
 
-  const handleShareBattle = async (blob: Blob) => {
-    const caption = battleCaption;
-    const file = new File([blob], "colour-clash-battle.png", {
-      type: "image/png",
-    });
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: "Colour Clash Battle",
-          text: caption,
-        });
-        return;
-      } catch {
-        // fallthrough to modal
-      }
-    }
-    setShowBattleModal(true);
-  };
-
-  const buildBattleCard = async () => {
+  const buildVsCard = async (
+    challengerScore: number,
+    challengerPhoto: string,
+    friendScore: number,
+    friendPhoto: string | null,
+  ): Promise<string> => {
     const W = 1080;
     const H = 600;
     const canvas = document.createElement("canvas");
     canvas.width = W;
     canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas.getContext("2d")!;
 
-    // Dark background
     ctx.fillStyle = "#0d0d1a";
     ctx.fillRect(0, 0, W, H);
 
-    // Get challenger from lookbook (most recent entry with different score)
-    let challengerEntry: { photoDataUrl: string; score: number } | null = null;
-    try {
-      const raw = localStorage.getItem("cc_lookbook");
-      if (raw) {
-        const entries = JSON.parse(raw) as Array<{
-          photoDataUrl: string;
-          score: number;
-        }>;
-        challengerEntry =
-          entries.find((e) => e.score !== score) ?? entries[1] ?? null;
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // Helper: draw a photo into a panel rect (cover fit)
     const drawPanel = async (
       dataUrl: string | null,
       x: number,
       y: number,
       w: number,
       h: number,
-      fallbackGrad: [string, string],
     ) => {
       if (dataUrl) {
         await new Promise<void>((res) => {
@@ -797,53 +940,32 @@ function ColorClashBattle({
         });
       } else {
         const grad = ctx.createLinearGradient(x, y, x + w, y + h);
-        grad.addColorStop(0, fallbackGrad[0]);
-        grad.addColorStop(1, fallbackGrad[1]);
+        grad.addColorStop(0, "#1a3a5c");
+        grad.addColorStop(1, "#0d1a2e");
         ctx.fillStyle = grad;
         ctx.fillRect(x, y, w, h);
       }
     };
 
-    // Left panel: Challenger
-    await drawPanel(challengerEntry?.photoDataUrl ?? null, 0, 0, 540, H, [
-      "#9966cc",
-      "#483d8b",
-    ]);
-    // Right panel: Current user
-    await drawPanel(photoDataUrl, 540, 0, 540, H, ["#1a3a5c", "#0d1a2e"]);
+    await drawPanel(challengerPhoto, 0, 0, W / 2, H);
+    await drawPanel(friendPhoto, W / 2, 0, W / 2, H);
 
-    // Dark overlays for text readability
-    ctx.fillStyle = "rgba(0,0,0,0.50)";
-    ctx.fillRect(0, 0, 540, H);
-    ctx.fillStyle = "rgba(0,0,0,0.50)";
-    ctx.fillRect(540, 0, 540, H);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(0, 0, W / 2, H);
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(W / 2, 0, W / 2, H);
 
-    // Winner/loser logic
-    const challengerScore = challengerEntry?.score ?? 0;
-    const challengerWins = challengerScore > score;
-    const userWins = score > challengerScore;
-    const isTie = challengerEntry && score === challengerScore;
+    const cWins = challengerScore > friendScore;
+    const fWins = friendScore > challengerScore;
+    const isTie = challengerScore === friendScore;
 
-    // Dim the loser panel further
-    if (!isTie && challengerEntry) {
-      ctx.fillStyle = "rgba(0,0,0,0.30)";
-      if (challengerWins) ctx.fillRect(540, 0, 540, H);
-      else ctx.fillRect(0, 0, 540, H);
+    if (!isTie) {
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      if (cWins) ctx.fillRect(W / 2, 0, W / 2, H);
+      else if (fWins) ctx.fillRect(0, 0, W / 2, H);
     }
 
-    // CHALLENGER label
-    ctx.fillStyle = "rgba(200,160,255,0.95)";
-    ctx.font = "bold 24px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("CHALLENGER", 270, 46);
-
-    // YOUR SCORE label
-    ctx.fillStyle = "rgba(135,206,235,0.95)";
-    ctx.font = "bold 24px system-ui";
-    ctx.fillText("YOUR SCORE", 810, 46);
-
-    // Score badge helper
-    const drawScoreBadge = (cx: number, cy: number, s: number) => {
+    const drawBadge = (cx: number, cy: number, s: number) => {
       ctx.beginPath();
       ctx.arc(cx, cy, 58, 0, Math.PI * 2);
       ctx.fillStyle = "#87CEEB";
@@ -860,43 +982,29 @@ function ColorClashBattle({
       ctx.fillText("/100", cx, cy + 30);
     };
 
-    if (challengerEntry) {
-      drawScoreBadge(270, 110, challengerScore);
-    } else {
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.font = "18px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("Be the first!", 270, 300);
-      ctx.font = "14px system-ui";
-      ctx.fillText("Share to challenge friends", 270, 330);
-    }
-    drawScoreBadge(810, 110, score);
+    ctx.fillStyle = "rgba(135,206,235,0.95)";
+    ctx.font = "bold 22px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("CHALLENGER", W / 4, 44);
+    ctx.fillStyle = "rgba(255,200,120,0.95)";
+    ctx.fillText("YOUR SCORE", (W * 3) / 4, 44);
 
-    // Winner crown
-    if (!isTie && challengerEntry) {
-      ctx.font = "34px system-ui";
-      ctx.textAlign = "center";
-      if (challengerWins) {
-        ctx.fillText("👑 WINNER", 270, H - 72);
-      } else if (userWins) {
-        ctx.fillText("👑 WINNER", 810, H - 72);
-      }
-    } else if (isTie) {
+    drawBadge(W / 4, 110, challengerScore);
+    drawBadge((W * 3) / 4, 110, friendScore);
+
+    ctx.font = "32px system-ui";
+    ctx.textAlign = "center";
+    if (!isTie) {
+      if (cWins) ctx.fillText("👑 WINNER!", W / 4, H - 60);
+      else if (fWins) ctx.fillText("👑 WINNER!", (W * 3) / 4, H - 60);
+    } else {
       ctx.fillStyle = "#FFD700";
       ctx.font = "bold 22px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("🤝 IT'S A TIE!", 540, H - 72);
-    } else if (!challengerEntry) {
-      // No challenger yet
-      ctx.fillStyle = "#FFD700";
-      ctx.font = "bold 20px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("👑 WINNER — CAN YOU BEAT THIS?", 810, H - 72);
+      ctx.fillText("🤝 IT'S A TIE!", W / 2, H - 60);
     }
 
-    // VS badge (center)
     ctx.beginPath();
-    ctx.arc(540, H / 2, 44, 0, Math.PI * 2);
+    ctx.arc(W / 2, H / 2, 44, 0, Math.PI * 2);
     ctx.fillStyle = "#DC143C";
     ctx.fill();
     ctx.strokeStyle = "#FFD700";
@@ -905,38 +1013,345 @@ function ColorClashBattle({
     ctx.fillStyle = "#FFFFFF";
     ctx.font = "bold 28px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("VS", 540, H / 2 + 10);
+    ctx.fillText("VS", W / 2, H / 2 + 10);
 
-    // Bottom strip
     ctx.fillStyle = "rgba(0,0,0,0.78)";
     ctx.fillRect(0, H - 50, W, 50);
     ctx.fillStyle = "#FFD700";
     ctx.font = "bold 18px system-ui";
     ctx.textAlign = "left";
-    ctx.fillText("COLOUR CLASH", 24, H - 18);
+    ctx.fillText("COLOUR CLASH BATTLE ⚔️", 24, H - 18);
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = "13px system-ui";
     ctx.textAlign = "right";
     ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
 
-    const caption = `I just scored ${score}/100 on Colour Clash! Think you can beat me? ⚔️ #ColourClash #ColorClashBattle\n\nhttps://colourclash-emb.caffeine.xyz/`;
-    setBattleCaption(caption);
-    navigator.clipboard.writeText(caption).catch(() => {});
+    return new Promise<string>((res) => {
+      canvas.toBlob((b) => res(b ? URL.createObjectURL(b) : ""), "image/png");
+    });
+  };
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      setBattleImageUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return URL.createObjectURL(blob);
+  // Check for battle result on mount (only runs when score > 0 and battle mode active)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: buildVsCard is stable
+  useEffect(() => {
+    if (!isBattleMode || score <= 0) return;
+    const raw = localStorage.getItem("cc_battle_challenger");
+    if (!raw) return;
+    try {
+      const challenger = JSON.parse(raw) as {
+        score: number;
+        photoDataUrl: string;
+        date: string;
+      };
+      buildVsCard(
+        challenger.score,
+        challenger.photoDataUrl,
+        score,
+        photoDataUrl,
+      )
+        .then((url) => {
+          setVsCardUrl(url);
+          if (score > challenger.score) setVsResult("win");
+          else if (score < challenger.score) setVsResult("lose");
+          else setVsResult("tie");
+          setShowVsModal(true);
+        })
+        .catch(console.error);
+    } catch {
+      /* ignore */
+    }
+  }, [isBattleMode, score]);
+
+  const buildChallengeCard = async () => {
+    if (!photoDataUrl || score <= 0) return;
+    setBuilding(true);
+    try {
+      localStorage.setItem(
+        "cc_battle_challenger",
+        JSON.stringify({
+          score,
+          photoDataUrl,
+          date: new Date().toISOString(),
+        }),
+      );
+
+      const W = 1080;
+      const H = 1920;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d")!;
+
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, "#0a0a1a");
+      bgGrad.addColorStop(1, "#1a0a2e");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(0, 0, W, 120);
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 52px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("COLOUR CLASH BATTLE ⚔️", W / 2, 78);
+
+      const photoAreaH = H - 240;
+      await new Promise<void>((res) => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, 120, W / 2 - 8, photoAreaH);
+          ctx.clip();
+          const ir = img.naturalWidth / img.naturalHeight;
+          const cr = (W / 2 - 8) / photoAreaH;
+          let sx = 0;
+          let sy = 0;
+          let sw = img.naturalWidth;
+          let sh = img.naturalHeight;
+          if (ir > cr) {
+            sw = img.naturalHeight * cr;
+            sx = (img.naturalWidth - sw) / 2;
+          } else {
+            sh = img.naturalWidth / cr;
+            sy = (img.naturalHeight - sh) / 2;
+          }
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 120, W / 2 - 8, photoAreaH);
+          ctx.restore();
+          res();
+        };
+        img.onerror = () => res();
+        img.src = photoDataUrl!;
       });
-      await handleShareBattle(blob);
-    }, "image/png");
+
+      ctx.strokeStyle = "#3B82F6";
+      ctx.lineWidth = 6;
+      ctx.setLineDash([16, 8]);
+      ctx.strokeRect(6, 126, W / 2 - 20, photoAreaH - 12);
+      ctx.setLineDash([]);
+
+      const lBadgeCX = W / 4;
+      const lBadgeCY = 240;
+      ctx.beginPath();
+      ctx.arc(lBadgeCX, lBadgeCY, 72, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(lBadgeCX, lBadgeCY, 68, 0, Math.PI * 2);
+      ctx.strokeStyle = "#87CEEB";
+      ctx.lineWidth = 8;
+      ctx.stroke();
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 60px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(String(score), lBadgeCX, lBadgeCY + 12);
+      ctx.font = "bold 20px system-ui";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("YOUR SCORE", lBadgeCX, lBadgeCY + 48);
+
+      ctx.fillStyle = "#1a1a2e";
+      ctx.fillRect(W / 2 + 8, 120, W / 2 - 8, photoAreaH);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([14, 8]);
+      ctx.strokeRect(W / 2 + 16, 130, W / 2 - 28, photoAreaH - 20);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.font = "bold 200px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("?", (W * 3) / 4, photoAreaH / 2 + 240);
+
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "bold 36px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("YOUR OPPONENT", (W * 3) / 4, 220);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "28px system-ui";
+      ctx.fillText("Upload your photo to battle!", (W * 3) / 4, 280);
+
+      const rBadgeCX = (W * 3) / 4;
+      const rBadgeCY = 380;
+      ctx.beginPath();
+      ctx.arc(rBadgeCX, rBadgeCY, 72, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.1)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(rBadgeCX, rBadgeCY, 68, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.3)";
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "bold 44px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("??", rBadgeCX, rBadgeCY + 10);
+      ctx.font = "20px system-ui";
+      ctx.fillText("/100", rBadgeCX, rBadgeCY + 44);
+
+      const bottomY = H - 120;
+      ctx.fillStyle = "rgba(0,0,0,0.85)";
+      ctx.fillRect(0, bottomY, W, 120);
+
+      const qrDataUrl = await generateQRDataUrl(
+        "https://colourclash-emb.caffeine.xyz/?battle=1",
+        160,
+      );
+      await new Promise<void>((res) => {
+        const qrImg = new Image();
+        qrImg.onload = () => {
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.roundRect(W - 200, bottomY + 10, 176, 100, 8);
+          ctx.fill();
+          ctx.drawImage(qrImg, W - 192, bottomY + 18, 160, 80);
+          res();
+        };
+        qrImg.onerror = () => res();
+        qrImg.src = qrDataUrl;
+      });
+
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 30px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText("COLOUR CLASH", 40, bottomY + 50);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "22px system-ui";
+      ctx.fillText("Scan to join the battle! ⚔️", 40, bottomY + 84);
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "18px system-ui";
+      ctx.fillText("colourclash-emb.caffeine.xyz/?battle=1", 40, bottomY + 108);
+
+      const caption = `I scored ${score}/100 on my outfit! Think you can beat me? ⚔️ Open the link and upload YOUR photo to see who wins! #ColourClash\n\nhttps://colourclash-emb.caffeine.xyz/?battle=1`;
+      setBattleCaption(caption);
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        setChallengeCardUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+        setBuilding(false);
+        setBattleStarted(true);
+
+        const file = new File([blob], "colour-clash-battle.png", {
+          type: "image/png",
+        });
+        if (navigator.canShare?.({ files: [file] })) {
+          navigator
+            .share({
+              files: [file],
+              title: "Colour Clash Battle",
+              text: caption,
+            })
+            .catch(() => {});
+        }
+      }, "image/png");
+    } catch (err) {
+      console.error("Battle card error:", err);
+      toast.error("Could not build battle card");
+      setBuilding(false);
+    }
   };
 
   if (score === 0) return null;
 
   return (
     <>
+      {/* VS result modal */}
+      <AnimatePresence>
+        {showVsModal && vsCardUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+            onClick={() => setShowVsModal(false)}
+            data-ocid="score.modal"
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <div
+                className="bg-black flex items-center justify-center"
+                style={{ maxHeight: "45vh", overflow: "hidden" }}
+              >
+                <img
+                  src={vsCardUrl}
+                  alt="VS Battle card"
+                  className="w-full object-contain"
+                  style={{ maxHeight: "45vh" }}
+                />
+              </div>
+              <div className="p-4 space-y-3">
+                {vsResult === "win" && (
+                  <div className="text-center py-2">
+                    <div className="text-4xl mb-1">👑</div>
+                    <p className="text-lg font-black text-yellow-500">
+                      YOU WIN!
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Your outfit colours beat the challenger!
+                    </p>
+                  </div>
+                )}
+                {vsResult === "lose" && (
+                  <div className="text-center py-2">
+                    <div className="text-4xl mb-1">😤</div>
+                    <p className="text-lg font-black text-red-400">THEY WIN!</p>
+                    <p className="text-xs text-muted-foreground">
+                      Better luck next time — train your colour eye!
+                    </p>
+                  </div>
+                )}
+                {vsResult === "tie" && (
+                  <div className="text-center py-2">
+                    <div className="text-4xl mb-1">🤝</div>
+                    <p className="text-lg font-black text-blue-400">
+                      IT'S A TIE!
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Perfectly matched — you're both style stars!
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = vsCardUrl!;
+                      a.download = "colour-clash-vs.png";
+                      a.click();
+                      toast.success("VS card downloaded!");
+                    }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                    data-ocid="score.secondary_button"
+                  >
+                    <Download className="w-4 h-4" /> Download
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowVsModal(false)}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
+                    data-ocid="score.close_button"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BattleField card */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -949,37 +1364,37 @@ function ColorClashBattle({
             ⚔️
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">
-              Color Clash Battle
-            </p>
+            <p className="text-sm font-bold text-foreground">Battle Field</p>
             <p className="text-xs text-muted-foreground">
-              Challenge a friend — dare them to beat your score!
+              Score your outfit and challenge a friend to beat you!
             </p>
           </div>
         </div>
 
-        {!showBattle ? (
+        {!battleStarted ? (
           <button
             type="button"
-            onClick={() => {
-              setShowBattle(true);
-              buildBattleCard();
-            }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 hover:opacity-90"
+            onClick={buildChallengeCard}
+            disabled={building}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 hover:opacity-90 disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, #DC143C 0%, #8B0000 100%)",
             }}
             data-ocid="score.primary_button"
           >
-            ⚔️ Generate Battle Card
+            {building ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "⚔️ Start a Battle"
+            )}
           </button>
         ) : (
           <div className="space-y-3">
-            {battleImageUrl ? (
+            {challengeCardUrl ? (
               <div className="rounded-xl overflow-hidden border border-border/30">
                 <img
-                  src={battleImageUrl}
-                  alt="Battle card"
+                  src={challengeCardUrl}
+                  alt="Battle challenge card"
                   className="w-full object-contain"
                 />
               </div>
@@ -994,13 +1409,13 @@ function ColorClashBattle({
                 {battleCaption}
               </div>
             )}
-            {battleImageUrl && (
+            {challengeCardUrl && (
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     const a = document.createElement("a");
-                    a.href = battleImageUrl!;
+                    a.href = challengeCardUrl!;
                     a.download = "colour-clash-battle.png";
                     a.click();
                     toast.success("Battle card downloaded!");
@@ -1012,12 +1427,12 @@ function ColorClashBattle({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={() =>
                     navigator.clipboard
                       .writeText(battleCaption)
                       .then(() => toast.success("Caption copied!"))
-                      .catch(() => {});
-                  }}
+                      .catch(() => {})
+                  }
                   className="flex items-center justify-center gap-2 py-2 rounded-xl bg-muted text-foreground text-sm font-semibold"
                   data-ocid="score.secondary_button"
                 >
@@ -1025,10 +1440,13 @@ function ColorClashBattle({
                 </button>
               </div>
             )}
-            {battleImageUrl && (
+            {challengeCardUrl && (
               <button
                 type="button"
-                onClick={() => setShowBattleModal(true)}
+                onClick={() => {
+                  const text = encodeURIComponent(battleCaption);
+                  window.open(`https://wa.me/?text=${text}`, "_blank");
+                }}
                 className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-sm font-semibold"
                 style={{ background: "#25D366" }}
                 data-ocid="score.share.button"
@@ -1039,443 +1457,46 @@ function ColorClashBattle({
           </div>
         )}
       </motion.div>
-
-      {/* Battle share modal (desktop fallback) */}
-      <AnimatePresence>
-        {showBattleModal && battleImageUrl && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setShowBattleModal(false)}
-            data-ocid="score.modal"
-          >
-            <div
-              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <div
-                className="w-full bg-black flex items-center justify-center"
-                style={{ maxHeight: "50vh", overflow: "hidden" }}
-              >
-                <img
-                  src={battleImageUrl}
-                  alt="Battle card"
-                  className="w-full object-contain"
-                  style={{ maxHeight: "50vh" }}
-                />
-              </div>
-              <div className="p-4 space-y-3">
-                <p className="text-xs text-muted-foreground text-center">
-                  Save the image below, then share it on WhatsApp or any
-                  platform!
-                </p>
-                <div className="bg-muted rounded-xl p-3 text-xs text-foreground leading-relaxed">
-                  {battleCaption}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = battleImageUrl!;
-                      a.download = "colour-clash-battle.png";
-                      a.click();
-                      toast.success("Downloaded!");
-                    }}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-                    data-ocid="score.secondary_button"
-                  >
-                    <Download className="w-4 h-4" /> Download
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(battleCaption)
-                        .then(() => toast.success("Caption copied!"))
-                        .catch(() => {});
-                    }}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
-                    data-ocid="score.secondary_button"
-                  >
-                    <Copy className="w-4 h-4" /> Copy Caption
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowBattleModal(false)}
-                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
-                  data-ocid="score.close_button"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </>
   );
 }
 
-// ---- Clash Leaderboard Invite Component -----------------------------------
-function ClashLeaderboardInvite({
-  score,
-  photoDataUrl,
-}: {
-  score: number;
-  photoDataUrl: string | null;
-}) {
-  const [friendName, setFriendName] = useState("");
-  const [inviteImageUrl, setInviteImageUrl] = useState<string | null>(null);
-  const [inviteCaption, setInviteCaption] = useState("");
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [building, setBuilding] = useState(false);
+// ---- Shop Links Helper ---------------------------------------------------
 
-  const getUserName = () => {
-    try {
-      const p = JSON.parse(localStorage.getItem("cc_profile") || "{}");
-      return p.name || "A Friend";
-    } catch {
-      return "A Friend";
-    }
-  };
-
-  const buildInviteCard = async () => {
-    if (!friendName.trim()) {
-      toast.error("Please enter your friend's name");
-      return;
-    }
-    setBuilding(true);
-    try {
-      const W = 800;
-      const H = 600;
-      const canvas = document.createElement("canvas");
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const userName = getUserName();
-
-      // Background
-      const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-      bgGrad.addColorStop(0, "#0a0a1a");
-      bgGrad.addColorStop(1, "#1a0a2e");
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, W, H);
-
-      // Gold accent bar top
-      ctx.fillStyle = "#FFD700";
-      ctx.fillRect(0, 0, W, 6);
-
-      // Photo on right
-      if (photoDataUrl) {
-        await new Promise<void>((res) => {
-          const img = new Image();
-          img.onload = () => {
-            ctx.save();
-            ctx.beginPath();
-            ctx.roundRect(W - 240, 50, 190, 260, 16);
-            ctx.clip();
-            ctx.drawImage(img, W - 240, 50, 190, 260);
-            ctx.restore();
-            // Border
-            ctx.strokeStyle = "#FFD700";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.roundRect(W - 240, 50, 190, 260, 16);
-            ctx.stroke();
-            res();
-          };
-          img.onerror = () => res();
-          img.src = photoDataUrl;
-        });
-      }
-
-      // Challenge text
-      ctx.fillStyle = "#FFD700";
-      ctx.font = "bold 28px system-ui";
-      ctx.textAlign = "left";
-      const maxTW = W - 270;
-      const line1 = `${friendName.trim()},`;
-      const line2 = "Can you beat";
-      const line3 = `${userName}'s score?`;
-      ctx.fillText(line1, 40, 90);
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 24px system-ui";
-      ctx.fillText(line2, 40, 130);
-      ctx.fillStyle = "#87CEEB";
-      ctx.font = `bold ${Math.min(24, Math.floor(maxTW / (line3.length * 0.6)))}px system-ui`;
-      ctx.fillText(line3, 40, 164);
-
-      // Score circle
-      ctx.beginPath();
-      ctx.arc(130, 290, 80, 0, Math.PI * 2);
-      ctx.fillStyle = "#87CEEB";
-      ctx.fill();
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 56px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText(String(score), 130, 302);
-      ctx.font = "bold 18px system-ui";
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.fillText("/100", 130, 328);
-
-      // Grade
-      const grade =
-        score >= 90
-          ? "S"
-          : score >= 80
-            ? "A"
-            : score >= 70
-              ? "B"
-              : score >= 60
-                ? "C"
-                : score >= 50
-                  ? "D"
-                  : "F";
-      const gradeLabel =
-        score >= 90
-          ? "Style Master"
-          : score >= 80
-            ? "Great Look"
-            : score >= 70
-              ? "Good Combo"
-              : score >= 60
-                ? "Average"
-                : score >= 50
-                  ? "Needs Work"
-                  : "Bold Clash";
-      ctx.fillStyle = "#FFD700";
-      ctx.font = "bold 28px system-ui";
-      ctx.textAlign = "left";
-      ctx.fillText(`${grade} — ${gradeLabel}`, 240, 270);
-      ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.font = "15px system-ui";
-      ctx.fillText("Tap QR code to start your challenge!", 240, 302);
-
-      // QR code
-      const qrDataUrl = await generateQRDataUrl(
-        "https://colourclash-emb.caffeine.xyz",
-        120,
-      );
-      await new Promise<void>((res) => {
-        const qrImg = new Image();
-        qrImg.onload = () => {
-          ctx.fillStyle = "#ffffff";
-          ctx.beginPath();
-          ctx.roundRect(240, 320, 132, 132, 8);
-          ctx.fill();
-          ctx.drawImage(qrImg, 246, 326, 120, 120);
-          res();
-        };
-        qrImg.onerror = () => res();
-        qrImg.src = qrDataUrl;
-      });
-
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "12px system-ui";
-      ctx.textAlign = "left";
-      ctx.fillText("Scan to play", 248, 468);
-
-      // Bottom strip
-      ctx.fillStyle = "rgba(0,0,0,0.75)";
-      ctx.fillRect(0, H - 48, W, 48);
-      ctx.fillStyle = "#FFD700";
-      ctx.font = "bold 18px system-ui";
-      ctx.textAlign = "left";
-      ctx.fillText("COLOUR CLASH", 24, H - 18);
-      ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.font = "13px system-ui";
-      ctx.textAlign = "right";
-      ctx.fillText("colourclash-emb.caffeine.xyz", W - 24, H - 18);
-
-      const caption = `${friendName.trim()}, ${userName} just scored ${score}/100 on Colour Clash! Think you can beat that? Scan the QR code to try! 🎯 #ColourClash
-
-https://colourclash-emb.caffeine.xyz/`;
-      setInviteCaption(caption);
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        setInviteImageUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return URL.createObjectURL(blob);
-        });
-        const file = new File([blob], "colour-clash-invite.png", {
-          type: "image/png",
-        });
-        if (navigator.canShare?.({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: "Colour Clash Challenge",
-              text: caption,
-            });
-            setBuilding(false);
-            return;
-          } catch {
-            /* fallthrough */
-          }
-        }
-        setShowInviteModal(true);
-        setBuilding(false);
-      }, "image/png");
-    } catch (err) {
-      console.error("Invite card error:", err);
-      toast.error("Could not build invite card");
-      setBuilding(false);
-    }
-  };
-
-  if (score === 0) return null;
-
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 340, damping: 28 }}
-        className="mt-4 bg-card border border-border/30 rounded-2xl p-4"
-        data-ocid="score.card"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-lg">
-            🏆
-          </div>
-          <div>
-            <p className="text-sm font-bold text-foreground">
-              Challenge a Friend
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Generate a personalised challenge card
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={friendName}
-            onChange={(e) => setFriendName(e.target.value)}
-            placeholder="Enter your friend's name..."
-            className="flex-1 px-3 py-2 text-sm rounded-xl bg-muted text-foreground border border-border/30 outline-none focus:ring-2 focus:ring-primary/40"
-            data-ocid="score.input"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") buildInviteCard();
-            }}
-          />
-          <button
-            type="button"
-            onClick={buildInviteCard}
-            disabled={building}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-bold transition-all active:scale-95 disabled:opacity-60"
-            style={{
-              background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-              color: "#000",
-            }}
-            data-ocid="score.primary_button"
-          >
-            {building ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              "🚀 Generate"
-            )}
-          </button>
-        </div>
-        {inviteImageUrl && (
-          <div className="mt-3 rounded-xl overflow-hidden border border-border/30">
-            <img
-              src={inviteImageUrl}
-              alt="Invite card"
-              className="w-full object-contain"
-            />
-          </div>
-        )}
-      </motion.div>
-
-      {/* Invite share modal */}
-      <AnimatePresence>
-        {showInviteModal && inviteImageUrl && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setShowInviteModal(false)}
-            data-ocid="score.modal"
-          >
-            <div
-              className="w-full max-w-sm bg-background rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-            >
-              <div
-                className="w-full bg-black flex items-center justify-center"
-                style={{ maxHeight: "45vh", overflow: "hidden" }}
-              >
-                <img
-                  src={inviteImageUrl}
-                  alt="Invite card"
-                  className="w-full object-contain"
-                  style={{ maxHeight: "45vh" }}
-                />
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="bg-muted rounded-xl p-3 text-xs text-foreground leading-relaxed">
-                  {inviteCaption}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const a = document.createElement("a");
-                      a.href = inviteImageUrl!;
-                      a.download = "colour-clash-invite.png";
-                      a.click();
-                      toast.success("Downloaded!");
-                    }}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
-                    data-ocid="score.secondary_button"
-                  >
-                    <Download className="w-4 h-4" /> Download
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(inviteCaption)
-                        .then(() => toast.success("Caption copied!"))
-                        .catch(() => {});
-                    }}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold"
-                    data-ocid="score.secondary_button"
-                  >
-                    <Copy className="w-4 h-4" /> Copy Caption
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  className="w-full py-2 rounded-xl bg-muted text-sm font-medium text-muted-foreground"
-                  data-ocid="score.close_button"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
+function buildShopLinks(colorName: string, _colorHex: string) {
+  const gender = localStorage.getItem("cc_gender") || "women";
+  const genderPath = gender === "male" ? "men" : "women";
+  const q = encodeURIComponent(`${colorName} ${genderPath} clothing`);
+  return [
+    {
+      name: "House of Indya",
+      brandColor: "#9B2335",
+      url: `https://www.houseofindya.com/Colourclash?q=${encodeURIComponent(colorName)}`,
+    },
+    {
+      name: "Myntra",
+      brandColor: "#FF3F6C",
+      url: `https://www.myntra.com/${genderPath}?rawQuery=${q}`,
+    },
+    {
+      name: "Amazon",
+      brandColor: "#FF9900",
+      url: `https://www.amazon.in/s?k=${q}&rh=n:1571271031`,
+    },
+    {
+      name: "Ajio",
+      brandColor: "#DC2626",
+      url: `https://www.ajio.com/search/?text=${q}`,
+    },
+    {
+      name: "Meesho",
+      brandColor: "#9B59B6",
+      url: `https://www.meesho.com/search?q=${q}`,
+    },
+  ];
 }
 
+// ---- Main Component -------------------------------------------------------
 // ---- Main Component -------------------------------------------------------
 
 export default function OutfitScorePage({
@@ -1545,6 +1566,19 @@ export default function OutfitScorePage({
     name: string;
   } | null>(null);
 
+  // Battle mode detection
+  const [isBattleMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("battle") === "1";
+  });
+
+  // Score celebration popup
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [selectedSkinSwatch, setSelectedSkinSwatch] = useState<{
+    color: string;
+    name: string;
+  } | null>(null);
+
   // File input refs
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -1556,6 +1590,20 @@ export default function OutfitScorePage({
   useEffect(() => {
     setLookbook(getLookbook());
   }, []);
+
+  // Trigger score celebration - fires when pageState enters results
+  useEffect(() => {
+    if (pageState === "results") {
+      const s =
+        currentEntry?.score ??
+        scoreResult?.score ??
+        coupleResult?.harmonyScore ??
+        0;
+      if (s >= 70) {
+        setShowCelebration(true);
+      }
+    }
+  }, [pageState, currentEntry, scoreResult, coupleResult]);
 
   // Handle file selection (both camera and gallery)
   const handleFileSelect = useCallback(
@@ -2703,118 +2751,55 @@ ${APP_LINK}`);
             </p>
             <div className="grid grid-cols-6 gap-1.5">
               {skinPalette.map((item) => (
-                <div
+                <button
                   key={item.name}
-                  className="flex flex-col items-center gap-0.5"
+                  type="button"
+                  className="flex flex-col items-center gap-0.5 bg-transparent border-0 p-0 cursor-pointer"
+                  onClick={() =>
+                    setSelectedSkinSwatch(
+                      selectedSkinSwatch?.name === item.name ? null : item,
+                    )
+                  }
+                  data-ocid="score.button"
                 >
                   <div
-                    className="w-10 h-10 rounded-full border-2 border-white shadow-md"
-                    style={{ background: item.color }}
+                    className="w-10 h-10 rounded-full border-2 shadow-md transition-transform"
+                    style={{
+                      background: item.color,
+                      borderColor:
+                        selectedSkinSwatch?.name === item.name
+                          ? "#87CEEB"
+                          : "white",
+                      transform:
+                        selectedSkinSwatch?.name === item.name
+                          ? "scale(1.2)"
+                          : "scale(1)",
+                    }}
                   />
                   <span className="text-[9px] text-center text-muted-foreground leading-tight">
                     {item.name}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
-          </motion.div>
-        )}
-
-        {/* Path to 100% swatches */}
-        {pathTo100.length > 0 && (
-          <div className="mt-3 bg-card border border-border/30 rounded-2xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">
-              🎯 AI Suggestion: How to get 100% with this look.
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Tap a colour to shop it
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {pathTo100.map((swatch, idx) => {
-                const isSelected = shopSwatch?.name === swatch.name;
-                return (
-                  <button
-                    type="button"
-                    key={`${swatch.name}-${idx}`}
-                    className="flex flex-col items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
-                    onClick={() => setShopSwatch(isSelected ? null : swatch)}
-                    data-ocid="score.button"
-                  >
-                    <div
-                      className="w-12 h-12 rounded-full shadow-md border-2 transition-all"
-                      style={{
-                        background: swatch.color,
-                        borderColor: isSelected
-                          ? "#fff"
-                          : "rgba(255,255,255,0.2)",
-                        transform: isSelected ? "scale(1.15)" : "scale(1)",
-                        boxShadow: isSelected
-                          ? "0 0 0 3px rgba(135,206,235,0.7)"
-                          : undefined,
-                      }}
-                    />
-                    <span className="text-xs text-muted-foreground text-center leading-tight">
-                      {swatch.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {shopSwatch && (
-              <div className="pt-3 border-t border-border/20">
+            {/* Shop links for selected skin swatch */}
+            {selectedSkinSwatch && (
+              <div className="mt-3 pt-3 border-t border-border/20">
                 <p className="text-xs font-semibold text-foreground mb-2">
-                  🛍️ Shop {shopSwatch.name}:
+                  🛍️ Shop {selectedSkinSwatch.name} outfits:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    {
-                      name: "House of Indya",
-                      url: `https://www.houseofindya.com/Colourclash?q=${encodeURIComponent(shopSwatch.name)}`,
-                      color: "#9B2335",
-                    },
-                    {
-                      name: "Amazon",
-                      url: `https://www.amazon.in/s?k=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
-                      color: "#FF9900",
-                    },
-                    {
-                      name: "Flipkart",
-                      url: `https://www.flipkart.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
-                      color: "#2874F0",
-                    },
-                    {
-                      name: "Myntra",
-                      url: `https://www.myntra.com/${encodeURIComponent(shopSwatch.name)}`,
-                      color: "#FF3F6C",
-                    },
-                    {
-                      name: "Ajio",
-                      url: `https://www.ajio.com/search/?text=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
-                      color: "#DC2626",
-                    },
-                    {
-                      name: "Meesho",
-                      url: `https://www.meesho.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
-                      color: "#0D9488",
-                    },
-                    {
-                      name: "Nykaa",
-                      url: `https://www.nykaa.com/search/result/?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
-                      color: "#FC2779",
-                    },
-                    {
-                      name: "Offduty",
-                      url: `https://offduty.in/search?type=product&q=${encodeURIComponent(shopSwatch.name)}`,
-                      color: "#8B6914",
-                    },
-                  ].map((retailer) => (
+                  {buildShopLinks(
+                    selectedSkinSwatch.name,
+                    selectedSkinSwatch.color,
+                  ).map((retailer) => (
                     <a
                       key={retailer.name}
                       href={retailer.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs px-3 py-1.5 rounded-full font-medium text-white transition-opacity hover:opacity-80"
-                      style={{ background: retailer.color }}
+                      style={{ background: retailer.brandColor }}
                       data-ocid="score.button"
                     >
                       {retailer.name}
@@ -2823,19 +2808,134 @@ ${APP_LINK}`);
                 </div>
               </div>
             )}
-          </div>
+          </motion.div>
         )}
 
-        {/* ⚔️ Color Clash Battle */}
-        <ColorClashBattle
-          score={currentEntry?.score ?? 0}
-          photoDataUrl={currentEntry?.photoDataUrl ?? null}
-        />
+        {/* Path to 100% / Perfect score message */}
+        {score === 100 ? (
+          <div className="mt-3 bg-gradient-to-br from-pink-50 to-red-50 dark:from-pink-950/20 dark:to-red-950/20 border border-pink-200 dark:border-pink-800 rounded-2xl p-5 text-center space-y-2">
+            <div className="text-3xl">💯</div>
+            <h3 className="text-base font-bold text-pink-700 dark:text-pink-300">
+              You are perfect in colour matching!
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              No suggestions required — your outfit is absolutely flawless. Your
+              colour coordination is on point and you are rocking it! Keep
+              inspiring everyone around you. 👑
+            </p>
+          </div>
+        ) : (
+          pathTo100.length > 0 && (
+            <div className="mt-3 bg-card border border-border/30 rounded-2xl p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                🎯 AI Suggestion: How to get 100% with this look.
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Tap a colour to shop it
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {pathTo100.map((swatch, idx) => {
+                  const isSelected = shopSwatch?.name === swatch.name;
+                  return (
+                    <button
+                      type="button"
+                      key={`${swatch.name}-${idx}`}
+                      className="flex flex-col items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                      onClick={() => setShopSwatch(isSelected ? null : swatch)}
+                      data-ocid="score.button"
+                    >
+                      <div
+                        className="w-12 h-12 rounded-full shadow-md border-2 transition-all"
+                        style={{
+                          background: swatch.color,
+                          borderColor: isSelected
+                            ? "#fff"
+                            : "rgba(255,255,255,0.2)",
+                          transform: isSelected ? "scale(1.15)" : "scale(1)",
+                          boxShadow: isSelected
+                            ? "0 0 0 3px rgba(135,206,235,0.7)"
+                            : undefined,
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground text-center leading-tight">
+                        {swatch.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {shopSwatch && (
+                <div className="pt-3 border-t border-border/20">
+                  <p className="text-xs font-semibold text-foreground mb-2">
+                    🛍️ Shop {shopSwatch.name}:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      {
+                        name: "House of Indya",
+                        url: `https://www.houseofindya.com/Colourclash?q=${encodeURIComponent(shopSwatch.name)}`,
+                        color: "#9B2335",
+                      },
+                      {
+                        name: "Amazon",
+                        url: `https://www.amazon.in/s?k=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        color: "#FF9900",
+                      },
+                      {
+                        name: "Flipkart",
+                        url: `https://www.flipkart.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        color: "#2874F0",
+                      },
+                      {
+                        name: "Myntra",
+                        url: `https://www.myntra.com/${encodeURIComponent(shopSwatch.name)}`,
+                        color: "#FF3F6C",
+                      },
+                      {
+                        name: "Ajio",
+                        url: `https://www.ajio.com/search/?text=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        color: "#DC2626",
+                      },
+                      {
+                        name: "Meesho",
+                        url: `https://www.meesho.com/search?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        color: "#0D9488",
+                      },
+                      {
+                        name: "Nykaa",
+                        url: `https://www.nykaa.com/search/result/?q=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        color: "#FC2779",
+                      },
+                      {
+                        name: "Offduty",
+                        url: `https://offduty.in/search?type=product&q=${encodeURIComponent(shopSwatch.name)}`,
+                        color: "#8B6914",
+                      },
+                    ].map((retailer) => (
+                      <a
+                        key={retailer.name}
+                        href={retailer.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-full font-medium text-white transition-opacity hover:opacity-80"
+                        style={{ background: retailer.color }}
+                        data-ocid="score.button"
+                      >
+                        {retailer.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        )}
 
-        {/* 🏆 Challenge a Friend */}
-        <ClashLeaderboardInvite
+        {/* ⚔️ Battle Field */}
+        <BattleField
           score={currentEntry?.score ?? 0}
           photoDataUrl={currentEntry?.photoDataUrl ?? null}
+          isBattleMode={isBattleMode}
         />
 
         {/* Share sheet */}
@@ -2990,6 +3090,20 @@ ${APP_LINK}`);
 
   return (
     <div className="w-full max-w-md mx-auto pb-8 px-4 pt-2">
+      {/* Score Celebration Popup */}
+      <AnimatePresence>
+        {showCelebration && pageState === "results" && (
+          <ScoreCelebration
+            score={
+              currentEntry?.score ??
+              scoreResult?.score ??
+              coupleResult?.harmonyScore ??
+              0
+            }
+            onDismiss={() => setShowCelebration(false)}
+          />
+        )}
+      </AnimatePresence>
       {/* Page header */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex items-center gap-1.5">

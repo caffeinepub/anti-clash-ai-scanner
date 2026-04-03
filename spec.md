@@ -1,72 +1,70 @@
-# Colour Clash — Battle Card + 4 New Shareable Features
+# Colour Clash - Score Tab Overhaul (v61)
 
 ## Current State
-
-The app is fully built (Version 59). OutfitScorePage.tsx contains:
-- `ColorClashBattle` component: generates a battle card PNG on canvas (800x600) showing current photo on left, score on right, VS badge, CAN YOU BEAT X? text. Share to WhatsApp currently uses `wa.me/?text=` which only sends the caption URL — the PNG image is NOT shared.
-- `buildShareImage()` function: builds 1080x1920 share card for the main score share (this works correctly via native share API on mobile, or in-browser modal on desktop).
-- Lookbook entries stored in `cc_lookbook` localStorage.
-- The battle card does NOT support side-by-side comparison with a previous score.
-
-Current 4 extra features in the app: Daily Style Challenge, Style DNA Report, Color Clash Battle (existing), Seasonal Palette Forecast.
+- OutfitScorePage.tsx (3036 lines) contains all scoring, sharing, battle, invite, and skin tone logic
+- `ColorClashBattle` component builds a side-by-side card using the CURRENT + a past lookbook entry (not a fresh friend upload)
+- `ClashLeaderboardInvite` component: 'Challenge a Friend' — generates a personalised invite card with friend's name
+- Skin tone swatches (score < 70): shows colored circles with name labels but NO shop links
+- Path to 100% section: always shows 9 swatches + shop links regardless of score
+- No score-based popup/celebration animations exist
+- Share app link is https://colourclash-emb.caffeine.xyz (no deep link to score tab)
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Battle Card Comparison Mode**: When user clicks "Generate Battle Card", if there's a previous lookbook entry from a different session, show a side-by-side comparison: LEFT = previous photo + previous score, RIGHT = current photo + current score. Highlight the winner with a gold crown emoji and "WINNER" text. The resulting battle card PNG must be shareable and include both photos side by side.
-- **Battle Card Share Fix**: The battle card PNG must actually be shared (not just caption text). On mobile: use `navigator.share({ files: [file] })` to send the PNG directly. On desktop: show in-browser modal with Download Image + Copy Caption (same pattern as the main share card).
-- **4 New Shareable Features** (all must be independent, not overlap with existing features, and produce shareable PNG cards):
-  1. **Outfit Repeat Tracker** (FavoritesPage or ScannerPage): Tracks when user wears the same color combo again. If the user has scanned similar colors before, show a "Repeat Offender" or "Fresh Look" badge with a shareable card. Card shows streak of unique looks vs repeated combos.
-  2. **Color Personality Quiz** (FavoritesPage): A quick 3-question quiz (pick your favorite from 2 colors, 3 times) that generates a "Color Personality" result (e.g., "Bold Romantic", "Urban Explorer", "Classic Minimalist"). Result is a shareable portrait card with color palette swatches and personality description.
-  3. **Weekly Style Report** (FavoritesPage): Summarizes the week's scans — most-used color, highest score, style improvement tip. Shown as a shareable weekly summary card (portrait PNG).
-  4. **Clash Leaderboard Invite** (OutfitScorePage, shown after scoring): After scoring, a "Challenge a Friend" card appears. User enters a friend's name, and the app generates a personalized "[Friend], can you beat [UserName]'s score of [X]?" shareable PNG card with both score challenge and QR code.
+- **Battle flow (new):** 
+  1. After scoring, show a "Start Battle" button (not just a static card)
+  2. When tapped, generate a battle share card with user's score + photo on LEFT side, RIGHT side shows placeholder "Your friend's photo here" with "Can you beat [score]?"
+  3. Share app link = `https://colourclash-emb.caffeine.xyz/?battle=1` — when a friend opens this link, the app auto-navigates to the Score tab
+  4. When friend scores their outfit, app detects the `?battle=1` URL param and shows side-by-side comparison: left = friend's just-scored photo, right = challenger's last battle entry from localStorage
+  5. Display winner badge (crown icon) on the higher scoring side
+  6. Both photos visible side-by-side with scores, winner highlighted
+
+- **Score celebration popups (AnimatePresence):**
+  - Score 70-74: subtle confetti burst + "Nice outfit! 🎉" toast
+  - Score 75-79: confetti + "Great Style! ✨" toast with color burst
+  - Score 80-84: bigger burst + "Impressive! 🌟" toast
+  - Score 85-89: fireworks + "Style Master! 🔥" modal popup (auto-dismiss 3s)
+  - Score 90-94: full-screen overlay + "Outstanding! 💎" (auto-dismiss 3s)
+  - Score 95-99: full-screen gold overlay + "Elite Stylist! 👑" (auto-dismiss 3s)
+  - Score 100: animated floating hearts (20+ hearts rise from bottom to top), full-screen pink/red overlay, "PERFECT SCORE! 💖 You are flawless!" text, auto-dismiss 4s
+  - Each tier has visually distinct animation/color
+
+- **Skin tone suggestions: shop links**
+  - When user clicks a skin tone colour swatch (below score < 70), show retailer shop links filtered by that color + home page gender/age (read `cc_gender` and `cc_age` from localStorage)
+  - Show at least: House of Indya, Myntra, Amazon, Ajio links
 
 ### Modify
-- `ColorClashBattle` component in `OutfitScorePage.tsx`: Completely rewrite `buildBattleCard` to support side-by-side comparison. Pull the most recent *different-session* lookbook entry as the challenger. If no previous entry exists, show a placeholder left panel with "Be the first!" and encourage sharing.
-- Battle card share button: Replace `wa.me/?text=` link with a proper share handler that uses `navigator.share({ files: [file] })` on mobile (with the PNG file) and falls back to in-browser modal on desktop.
-- Battle card canvas dimensions: Change to 1080x600 (landscape) to better show side-by-side comparison.
+- **Path to 100% section:**
+  - If score === 100: hide the 9-swatch section entirely, replace with a congratulatory note: "🎯 You are perfect in colour matching! No suggestions required — your outfit is flawless as it is. Keep rocking your style!"
+  - If score < 100: show swatches as before
+
+- **ColorClashBattle component:**
+  - Rename/repurpose as `BattleField` with the new flow described above
+  - Remove the old "Generate Battle Card" that pulls from lookbook for VS
+  - New flow: user scores → "⚔️ Start a Battle" button → generates challenge card → share → friend opens link → scores → side-by-side shown with winner
+
+- **ClashLeaderboardInvite component:**
+  - Remove entirely (disable 'Challenge a Friend')
 
 ### Remove
-- The simple `wa.me/?text=` anchor tag from the battle card share — replace with proper share function.
+- `ClashLeaderboardInvite` component and all its JSX rendering
+- Old battle card that silently pulls a past lookbook entry as the "opponent"
 
 ## Implementation Plan
-
-1. **Rewrite `buildBattleCard`** in `OutfitScorePage.tsx`:
-   - Canvas 1080x600 landscape
-   - Pull latest lookbook entry that is NOT the current entry (challenger from previous session)
-   - Left panel (540x600): challenger photo + score. If no challenger, show "Be the first!" color block
-   - Right panel (540x600): current user photo + current score
-   - VS badge center (red circle)
-   - Compare scores: winner gets gold "WINNER 👑" text above their panel, loser gets "Challenger"
-   - Bottom strip: "COLOUR CLASH" branding + QR code + app link
-   - Return blob for sharing
-
-2. **Fix battle card share**:
-   - `handleShareBattle(blob)`: try `navigator.share({ files: [file] })` first
-   - If fails/unsupported: show in-browser modal (same `showBattleSheet` state, show image + Download + Copy Caption)
-   - Remove the `wa.me/?text=` anchor
-
-3. **Add Outfit Repeat Tracker** to `FavoritesPage.tsx`:
-   - Read scan history from localStorage `cc_scan_history`
-   - Count repeated color names (within 20% HEX distance)
-   - Show badge: if >2 repeats = "Repeat Offender 🔄", else "Fresh Look ✨"
-   - Shareable canvas card (800x450)
-
-4. **Add Color Personality Quiz** to `FavoritesPage.tsx`:
-   - 3 rounds: show 2 color swatches per round, user picks one
-   - Map picks to personality type (8 combinations = 8 personalities)
-   - Show result card with personality name, description, color palette
-   - Shareable portrait PNG (800x1000)
-
-5. **Add Weekly Style Report** to `FavoritesPage.tsx`:
-   - Read last 7 days of lookbook entries
-   - Compute: most-used color, highest score, avg score, count
-   - Generate shareable PNG report card
-
-6. **Add Clash Leaderboard Invite** to `OutfitScorePage.tsx`:
-   - Appears in results view after scoring
-   - Input field for friend's name
-   - Build personalized challenge PNG: "[Friend], [UserName] scored X/100. Can you beat it?" + QR code
-   - Share via native share or in-browser modal
-
-7. All new features must be fully functional (no broken UI states) and produce downloadable/shareable PNG output.
+1. Remove `ClashLeaderboardInvite` component and its render call
+2. Rewrite `ColorClashBattle` → `BattleField` component:
+   a. Shows 'Start Battle' button after scoring
+   b. On click: saves current entry as `cc_battle_challenger` in localStorage (score + photoDataUrl + date)
+   c. Builds battle challenge card (portrait 9:16): user photo LEFT with score, RIGHT side = placeholder with "Can you beat [score]? Upload YOUR outfit!", QR code bottom linking to `https://colourclash-emb.caffeine.xyz/?battle=1`
+   d. Share button sends this card + caption: "I scored [X]/100! Can you beat me? Open the link to start your battle! 👊 #ColourClash"
+   e. On app load: read `?battle=1` URL param → if present, auto-navigate to Score tab AND set a `battleMode` flag
+   f. After friend scores: if `cc_battle_challenger` exists AND battleMode flag, show side-by-side comparison modal: left = challenger's photo + score, right = friend's just-scored photo + score. Winner (higher score) gets a golden crown badge overlay
+   g. Show "You Win! 👑" or "They Win! 😤 Try again?" message + option to share the VS card
+3. Add score celebration popup system:
+   a. `ScoreCelebration` component triggered by score value
+   b. 70-84: toast-style notification (auto-dismiss 2.5s) with confetti particles (CSS animation)
+   c. 85-99: full-screen overlay modal (auto-dismiss 3s) with animated elements per tier
+   d. 100: floating hearts animation (AnimatePresence, 24 hearts with staggered rise), pink gradient overlay, "PERFECT SCORE!" text
+4. Modify Path to 100% section: conditional render based on score === 100
+5. Modify Skin Tone section: on swatch click, expand a shop row below (House of Indya, Myntra, Amazon, Ajio) with URLs encoded with color name + gender + age from localStorage
