@@ -148,6 +148,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#1a1a2e", name: "Midnight Navy" },
     hers: { hex: "#c9a0dc", name: "Lavender Mist" },
     occasions: ["date night", "anniversary", "dinner", "evening"],
+    matchType: "complementary",
   },
   {
     id: 2,
@@ -155,6 +156,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#0077b6", name: "Ocean Blue" },
     hers: { hex: "#f4d58d", name: "Sandy Beige" },
     occasions: ["beach", "vacation", "outdoor", "travel", "holiday"],
+    matchType: "complementary",
   },
   {
     id: 3,
@@ -162,6 +164,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#2c3e50", name: "Charcoal" },
     hers: { hex: "#f5e6d3", name: "Champagne" },
     occasions: ["wedding", "formal", "reception", "ceremony"],
+    matchType: "neutral",
   },
   {
     id: 4,
@@ -176,6 +179,7 @@ const COUPLE_COMBINATIONS = [
       "diwali",
       "holi",
     ],
+    matchType: "ethnic",
   },
   {
     id: 5,
@@ -183,6 +187,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#6b4226", name: "Warm Brown" },
     hers: { hex: "#a8d5ba", name: "Sage Green" },
     occasions: ["outdoor", "picnic", "brunch", "casual", "travel"],
+    matchType: "analogous",
   },
   {
     id: 6,
@@ -190,6 +195,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#2d2d2d", name: "Jet Black" },
     hers: { hex: "#e8e8e8", name: "Soft White" },
     occasions: ["office", "corporate", "formal", "business", "gala"],
+    matchType: "formal",
   },
   {
     id: 7,
@@ -197,6 +203,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#aec6cf", name: "Baby Blue" },
     hers: { hex: "#ffb7c5", name: "Blush Pink" },
     occasions: ["brunch", "spring", "garden", "birthday", "casual"],
+    matchType: "pastel",
   },
   {
     id: 8,
@@ -204,6 +211,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#2e4057", name: "Deep Teal" },
     hers: { hex: "#9b2226", name: "Burgundy" },
     occasions: ["gala", "wedding", "anniversary", "formal", "theatre"],
+    matchType: "complementary",
   },
   {
     id: 9,
@@ -211,6 +219,7 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#e76f51", name: "Terracotta" },
     hers: { hex: "#ffd166", name: "Warm Amber" },
     occasions: ["sunset", "rooftop", "dinner", "date", "summer"],
+    matchType: "analogous",
   },
   {
     id: 10,
@@ -218,6 +227,47 @@ const COUPLE_COMBINATIONS = [
     his: { hex: "#800020", name: "Deep Maroon" },
     hers: { hex: "#d4af37", name: "Royal Gold" },
     occasions: ["wedding", "puja", "ethnic", "diwali", "sangeet", "reception"],
+    matchType: "ethnic",
+  },
+  {
+    id: 11,
+    label: "Ocean Breeze",
+    his: { hex: "#023e8a", name: "Deep Blue" },
+    hers: { hex: "#48cae4", name: "Sky Cyan" },
+    occasions: ["beach", "cruise", "travel", "summer", "vacation"],
+    matchType: "monochromatic",
+  },
+  {
+    id: 12,
+    label: "Urban Glow",
+    his: { hex: "#3a3a3a", name: "Graphite" },
+    hers: { hex: "#ff6b6b", name: "Coral Red" },
+    occasions: ["city", "date", "casual", "brunch", "movie"],
+    matchType: "neutral",
+  },
+  {
+    id: 13,
+    label: "Forest Walk",
+    his: { hex: "#4a7c59", name: "Forest Green" },
+    hers: { hex: "#c9b99a", name: "Warm Tan" },
+    occasions: ["hiking", "outdoor", "nature", "casual", "weekend"],
+    matchType: "analogous",
+  },
+  {
+    id: 14,
+    label: "Neon Nights",
+    his: { hex: "#1a1a1a", name: "Onyx Black" },
+    hers: { hex: "#ff00ff", name: "Neon Magenta" },
+    occasions: ["club", "party", "concert", "night out", "rave"],
+    matchType: "bold",
+  },
+  {
+    id: 15,
+    label: "Spring Garden",
+    his: { hex: "#90e0ef", name: "Light Blue" },
+    hers: { hex: "#f9c6d0", name: "Petal Pink" },
+    occasions: ["garden", "spring", "picnic", "birthday", "brunch"],
+    matchType: "pastel",
   },
 ];
 
@@ -2372,6 +2422,7 @@ export default function FavoritesPage(_props?: {
 
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [coupleOccasion, setCoupleOccasion] = useState("");
+  const [coupleMatchPref, setCoupleMatchPref] = useState("all");
 
   const todayTip = STYLE_TIPS[new Date().getDate() % STYLE_TIPS.length];
 
@@ -2923,6 +2974,41 @@ export default function FavoritesPage(_props?: {
           <h2 className="text-base font-semibold mb-3" style={notebook.heading}>
             💑 Couple Match
           </h2>
+          {/* Colour Match Preference Dropdown */}
+          <div className="mb-3">
+            <label
+              htmlFor="matchPref"
+              className="block text-xs font-semibold mb-1"
+              style={{ color: notebook.accent, fontFamily: "Georgia, serif" }}
+            >
+              🎨 Colour Match Preference
+            </label>
+            <select
+              id="matchPref"
+              value={coupleMatchPref}
+              onChange={(e) => setCoupleMatchPref(e.target.value)}
+              className="w-full rounded-xl px-3 py-2 text-sm outline-none"
+              style={{
+                background: "#f0e8d8",
+                border: "1.5px solid #d4b896",
+                color: "#5c3d1e",
+                fontFamily: "Georgia, serif",
+              }}
+              data-ocid="favorites.select"
+            >
+              <option value="all">✨ All Combinations</option>
+              <option value="complementary">
+                🔵🟠 Complementary (Opposites)
+              </option>
+              <option value="analogous">🎨 Analogous (Similar Tones)</option>
+              <option value="monochromatic">🌊 Monochromatic (Same Hue)</option>
+              <option value="neutral">🤍 Neutrals + One Pop</option>
+              <option value="bold">🔥 Bold &amp; Vibrant</option>
+              <option value="pastel">🌸 Pastel &amp; Soft</option>
+              <option value="ethnic">🪔 Ethnic &amp; Festive</option>
+              <option value="formal">💼 Formal &amp; Classic</option>
+            </select>
+          </div>
           <div
             className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2"
             style={{ background: "#f0e8d8", border: "1.5px solid #d4b896" }}
@@ -2949,13 +3035,16 @@ export default function FavoritesPage(_props?: {
             )}
           </div>
           {(() => {
-            const filtered = coupleOccasion.trim()
-              ? COUPLE_COMBINATIONS.filter((c) =>
-                  c.occasions.some((o) =>
+            const filtered = COUPLE_COMBINATIONS.filter((c) => {
+              const matchesOccasion = coupleOccasion.trim()
+                ? c.occasions.some((o) =>
                     o.toLowerCase().includes(coupleOccasion.toLowerCase()),
-                  ),
-                )
-              : COUPLE_COMBINATIONS;
+                  )
+                : true;
+              const matchesPref =
+                coupleMatchPref === "all" || c.matchType === coupleMatchPref;
+              return matchesOccasion && matchesPref;
+            });
             if (filtered.length === 0) {
               return (
                 <p

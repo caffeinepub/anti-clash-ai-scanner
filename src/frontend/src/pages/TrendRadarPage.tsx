@@ -112,7 +112,7 @@ const RETAILER_FILTER = [
   {
     key: "all",
     label: "All",
-    url: (q: string) => `https://www.amazon.in/s?k=${q}`,
+    url: (q: string) => `https://www.amazon.in/s?k=${q}&tag=colourclash-21`,
   },
   {
     key: "indya",
@@ -123,7 +123,7 @@ const RETAILER_FILTER = [
   {
     key: "amazon",
     label: "Amazon",
-    url: (q: string) => `https://www.amazon.in/s?k=${q}`,
+    url: (q: string) => `https://www.amazon.in/s?k=${q}&tag=colourclash-21`,
   },
   {
     key: "flipkart",
@@ -232,7 +232,7 @@ function SeasonalPaletteForecast({
       case "indya":
         return `https://www.houseofindya.com/Colourclash?q=${q}`;
       case "amazon":
-        return `https://www.amazon.in/s?k=${q}`;
+        return `https://www.amazon.in/s?k=${q}&tag=colourclash-21`;
       case "flipkart":
         return `https://www.flipkart.com/search?q=${q}`;
       case "myntra":
@@ -246,7 +246,7 @@ function SeasonalPaletteForecast({
       case "offduty":
         return `https://offduty.in/search?q=${q}`;
       default:
-        return `https://www.amazon.in/s?k=${q}`;
+        return `https://www.amazon.in/s?k=${q}&tag=colourclash-21`;
     }
   };
 
@@ -307,17 +307,40 @@ function SeasonalPaletteForecast({
     ctx.font = "13px Arial";
     ctx.fillText("colourclash-emb.caffeine.xyz", 400, 365);
 
-    canvas.toBlob((blob) => {
+    canvas.toBlob(async (blob) => {
       if (!blob) return;
+      const caption = `This ${season.name} palette is 🔥 according to Colour Clash! Are you ready? #ColourClash #FashionForecast
+
+https://colourclash-emb.caffeine.xyz`;
+      const file = new File([blob], `colour-clash-forecast-${seasonKey}.png`, {
+        type: "image/png",
+      });
+      // Try native share with image (works on mobile)
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          await navigator.share({
+            title: "Colour Clash Forecast",
+            text: caption,
+            files: [file],
+          });
+          return;
+        } catch (_err) {
+          // User cancelled or browser blocked — fall through to download
+        }
+      }
+      // Desktop / fallback: download image + copy caption
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `colour-clash-forecast-${seasonKey}.png`;
       a.click();
       URL.revokeObjectURL(url);
-      const caption = `This ${season.name} palette is 🔥 according to Colour Clash! Are you ready? #ColourClash #FashionForecast`;
       navigator.clipboard.writeText(caption).catch(() => {});
-      toast.success("Forecast card downloaded! Caption copied.");
+      toast.success("Forecast card downloaded! Caption copied to clipboard.");
     }, "image/png");
   };
 
@@ -517,8 +540,8 @@ export default function TrendRadarPage() {
         CACHE_KEY,
         JSON.stringify({ timestamp: Date.now(), trends: parsed.trends }),
       );
-    } catch (err) {
-      console.error(err);
+    } catch (_err) {
+      console.error(_err);
       setTrends(FALLBACK_TRENDS);
       toast.error("Live trends unavailable. Showing curated 2026 picks.");
     } finally {

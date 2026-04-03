@@ -231,7 +231,7 @@ function buildRetailerUrl(
   const gk = encodeURIComponent(`${gPrefix}${garmentKeyword}`);
   switch (retailer) {
     case "amazon":
-      return `https://www.amazon.in/s?k=${gk}+${cn}${genderPrefix === "women" ? "&rh=n%3A1571271031" : genderPrefix === "men" ? "&rh=n%3A1968024031" : ""}`;
+      return `https://www.amazon.in/s?k=${gk}+${cn}&tag=colourclash-21${genderPrefix === "women" ? "&rh=n%3A1571271031" : genderPrefix === "men" ? "&rh=n%3A1968024031" : ""}`;
     case "flipkart":
       return `https://www.flipkart.com/search?q=${gk}+${cn}`;
     case "myntra":
@@ -250,7 +250,7 @@ function buildRetailerUrl(
     case "offduty":
       return `https://offduty.in/search?type=product&q=${q}`;
     default:
-      return `https://www.amazon.in/s?k=${q}`;
+      return `https://www.amazon.in/s?k=${q}&tag=colourclash-21`;
   }
 }
 

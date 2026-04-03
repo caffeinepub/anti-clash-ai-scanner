@@ -15,51 +15,33 @@ import {
   Users,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-// QR code generated via Google Charts API as a reliable fallback
+import QRCode from "qrcode";
+// QR code generated locally using qrcode library — no external API calls
 async function generateQRDataUrl(text: string, size = 120): Promise<string> {
-  return new Promise((resolve) => {
-    const encoded = encodeURIComponent(text);
-    const url = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encoded}&choe=UTF-8`;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (ctx) ctx.drawImage(img, 0, 0, size, size);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => {
-      // Fallback: draw a simple grid pattern
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = "#000000";
-        const cell = size / 10;
-        // Finder patterns top-left
-        ctx.fillRect(0, 0, 7 * cell, 7 * cell);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(cell, cell, 5 * cell, 5 * cell);
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(2 * cell, 2 * cell, 3 * cell, 3 * cell);
-        // Data pattern (simplified visual representation)
-        for (let i = 0; i < 10; i++) {
-          for (let j = 0; j < 10; j++) {
-            if ((i + j) % 2 === 0 && i > 7) {
-              ctx.fillRect(i * cell, j * cell, cell, cell);
-            }
-          }
-        }
-      }
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.src = url;
-  });
+  try {
+    const dataUrl = await QRCode.toDataURL(text, {
+      width: size,
+      margin: 1,
+      color: { dark: "#000000", light: "#FFFFFF" },
+      errorCorrectionLevel: "M",
+    });
+    return dataUrl;
+  } catch {
+    // Fallback: draw a simple placeholder
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = "#000000";
+      ctx.font = "bold 10px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("QR", size / 2, size / 2);
+    }
+    return canvas.toDataURL("image/png");
+  }
 }
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiTelegram, SiWhatsapp, SiX } from "react-icons/si";
@@ -1481,7 +1463,7 @@ function buildShopLinks(colorName: string, _colorHex: string) {
     {
       name: "Amazon",
       brandColor: "#FF9900",
-      url: `https://www.amazon.in/s?k=${q}&rh=n:1571271031`,
+      url: `https://www.amazon.in/s?k=${q}&tag=colourclash-21&rh=n:1571271031`,
     },
     {
       name: "Ajio",
@@ -2878,7 +2860,7 @@ ${APP_LINK}`);
                       },
                       {
                         name: "Amazon",
-                        url: `https://www.amazon.in/s?k=${encodeURIComponent(`${shopSwatch.name} clothing`)}`,
+                        url: `https://www.amazon.in/s?k=${encodeURIComponent(`${shopSwatch.name} clothing`)}&tag=colourclash-21`,
                         color: "#FF9900",
                       },
                       {
@@ -2931,12 +2913,14 @@ ${APP_LINK}`);
           )
         )}
 
-        {/* ⚔️ Battle Field */}
-        <BattleField
-          score={currentEntry?.score ?? 0}
-          photoDataUrl={currentEntry?.photoDataUrl ?? null}
-          isBattleMode={isBattleMode}
-        />
+        {/* ⚔️ Battle Field — disabled */}
+        {false && (
+          <BattleField
+            score={currentEntry?.score ?? 0}
+            photoDataUrl={currentEntry?.photoDataUrl ?? null}
+            isBattleMode={isBattleMode}
+          />
+        )}
 
         {/* Share sheet */}
         <AnimatePresence>
