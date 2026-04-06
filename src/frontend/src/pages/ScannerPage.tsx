@@ -2,24 +2,17 @@ import { useCamera } from "@/camera/useCamera";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  CalendarDays,
   Camera,
-  Check,
-  ClipboardCopy,
-  Flame,
   Heart,
-  ImagePlus,
   Layers,
   LayoutGrid,
   Loader2,
   Lock,
   RefreshCw,
-  ScanLine,
   Share2,
   Shirt,
   ShoppingBag,
   Sparkles,
-  Upload,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -31,16 +24,13 @@ import { useUserProfile } from "../context/UserProfileContext";
 import { useAddFavorite, useGetHarmonyAdvice } from "../hooks/useQueries";
 import { getColorName } from "../lib/colorNames";
 import {
+  analyzeRegionColors,
   generateMatchingColors,
   getColorFamily,
   hexToColorName,
   hexToHsl,
   sampleVideoColor,
 } from "../utils/colorUtils";
-import {
-  type GarmentDetectionResult,
-  detectGarmentFromImage,
-} from "../utils/geminiAI";
 
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
@@ -239,7 +229,7 @@ function buildRetailerUrl(
   const gk = encodeURIComponent(`${gPrefix}${garmentKeyword}`);
   switch (retailer) {
     case "amazon":
-      return `https://www.amazon.in/s?k=${gk}+${cn}&tag=colourclash-21${genderPrefix === "women" ? "&rh=n%3A1571271031" : genderPrefix === "men" ? "&rh=n%3A1968024031" : ""}`;
+      return `https://www.amazon.in/s?k=${gk}+${cn}${genderPrefix === "women" ? "&rh=n%3A1571271031" : genderPrefix === "men" ? "&rh=n%3A1968024031" : ""}`;
     case "flipkart":
       return `https://www.flipkart.com/search?q=${gk}+${cn}`;
     case "myntra":
@@ -258,7 +248,7 @@ function buildRetailerUrl(
     case "offduty":
       return `https://offduty.in/search?type=product&q=${q}`;
     default:
-      return `https://www.amazon.in/s?k=${q}&tag=colourclash-21`;
+      return `https://www.amazon.in/s?k=${q}`;
   }
 }
 
@@ -535,8 +525,8 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 
 function PaletteIconIcon({ cat }: { cat: string }) {
   const style: React.CSSProperties = {
-    width: "100%",
-    height: "100%",
+    width: "60%",
+    height: "60%",
     opacity: 0.9,
   };
   if (
@@ -899,9 +889,9 @@ function ShopMatchingStyles({
   }
 
   return (
-    <div className="p-4">
-      {/* Header row */}
-      <div className="flex items-center gap-2 mb-4">
+    <div className="space-y-3 p-4">
+      {/* Header */}
+      <div className="flex items-center gap-2">
         <div
           className="w-4 h-4 rounded-full flex-shrink-0"
           style={{
@@ -917,7 +907,7 @@ function ShopMatchingStyles({
         </span>
       </div>
 
-      {/* Card grid — 2 columns of compact tiles */}
+      {/* One full-width card per complementary garment type */}
       <AnimatePresence mode="wait">
         <motion.div
           key={shopColor.hex + garment.label + userGender}
@@ -925,76 +915,68 @@ function ShopMatchingStyles({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ type: "spring", stiffness: 380, damping: 32 }}
-          className="grid grid-cols-2 gap-3"
+          className="flex flex-col gap-4"
         >
           {sections.map((section, si) => {
             const keyword = GARMENT_KEYWORD_MAP[section.label] ?? "clothing";
             return (
               <motion.div
                 key={section.label}
-                className="creamy-card overflow-hidden flex flex-col"
+                className="creamy-card overflow-hidden w-full"
                 style={{
-                  borderRadius: 22,
-                  boxShadow: "0 8px 28px rgba(180,160,140,0.15)",
+                  borderRadius: 20,
+                  boxShadow: "0 10px 40px rgba(180,160,140,0.13)",
                 }}
-                initial={{ opacity: 0, y: 14, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  delay: si * 0.06,
+                  delay: si * 0.07,
                   type: "spring",
                   stiffness: 350,
                   damping: 28,
                 }}
                 data-ocid={`scanner.item.${si + 1}`}
               >
-                {/* Compact square colour tile */}
+                {/* Colour palette strip with transparent icon */}
                 <div
-                  className="relative flex items-center justify-center"
+                  className="relative w-full flex items-center justify-center"
                   style={{
-                    aspectRatio: "1 / 1",
+                    height: 110,
                     background: shopColor.hex,
-                    borderRadius: "22px 22px 0 0",
                   }}
                 >
-                  {/* Gradient overlay */}
+                  {/* Subtle gradient overlay for depth */}
                   <div
                     className="absolute inset-0"
                     style={{
                       background:
-                        "linear-gradient(160deg, rgba(255,255,255,0.22) 0%, rgba(0,0,0,0.12) 100%)",
-                      borderRadius: "22px 22px 0 0",
+                        "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(0,0,0,0.08) 100%)",
                     }}
                   />
-                  {/* Garment icon (large, centered) */}
-                  <div
-                    className="relative z-10 flex items-center justify-center"
-                    style={{ width: 72, height: 72 }}
-                  >
+                  {/* Transparent garment icon */}
+                  <div className="relative z-10 flex flex-col items-center gap-1">
                     <PaletteIconIcon cat={section.label.toLowerCase()} />
-                  </div>
-                  {/* Colour name pill — bottom of tile */}
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-center">
                     <span
-                      className="text-white font-bold text-[10px] tracking-wide uppercase bg-black/30 backdrop-blur-sm rounded-full px-2 py-0.5"
-                      style={{ textShadow: "0 1px 3px rgba(0,0,0,0.5)" }}
+                      className="text-white font-bold text-xs tracking-wide uppercase"
+                      style={{ textShadow: "0 1px 4px rgba(0,0,0,0.45)" }}
                     >
                       {section.garment!.emoji} {section.label}
                     </span>
                   </div>
-                  {/* Colour hex chip — top-right */}
-                  <div className="absolute top-1.5 right-1.5 bg-black/25 backdrop-blur-sm rounded-full px-1.5 py-0.5">
-                    <span className="text-white text-[8px] font-semibold">
+                  {/* Colour name pill top-right */}
+                  <div className="absolute top-2 right-3 bg-black/30 backdrop-blur-sm rounded-full px-2.5 py-0.5">
+                    <span className="text-white text-[10px] font-semibold">
                       {shopColor.name}
                     </span>
                   </div>
                 </div>
 
-                {/* Retailer buttons — compact pills */}
-                <div className="p-2 space-y-1.5">
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Shop →
+                {/* Retailer shop buttons */}
+                <div className="p-3 space-y-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Shop this look →
                   </p>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     {RETAILERS.map((retailer) => (
                       <a
                         key={retailer.key}
@@ -1008,17 +990,20 @@ function ShopMatchingStyles({
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={`flex items-center justify-between w-full rounded-lg px-2 py-1.5 text-[10px] font-bold text-white transition-opacity active:opacity-70 hover:opacity-90 ${retailer.badgeClass}`}
+                        className={`flex items-center justify-between w-full rounded-xl px-4 py-2.5 text-[12px] font-bold text-white transition-opacity active:opacity-70 hover:opacity-90 ${retailer.badgeClass}`}
                         style={{ backgroundColor: retailer.color }}
                         data-ocid="scanner.link"
                       >
                         <span>{retailer.badge}</span>
-                        <span className="text-[8px] opacity-80">→</span>
+                        <span className="text-[10px] opacity-90">
+                          {shopColor.name} {section.label} →
+                        </span>
                       </a>
                     ))}
                     {sizeHint && (
-                      <p className="text-center text-[9px] text-muted-foreground mt-0.5">
-                        Size: <span className="font-semibold">{sizeHint}</span>
+                      <p className="text-center text-[10px] text-muted-foreground mt-1">
+                        Suggested size:{" "}
+                        <span className="font-semibold">{sizeHint}</span>
                       </p>
                     )}
                   </div>
@@ -1304,9 +1289,7 @@ function getColorOfDay() {
   return COLOR_OF_DAY_PALETTE[dayOfYear % COLOR_OF_DAY_PALETTE.length];
 }
 
-function ColorOfDayBanner({
-  onTryColor,
-}: { onTryColor?: (hex: string, name: string) => void }) {
+function ColorOfDayBanner() {
   const [dismissed, setDismissed] = useState(() => {
     const key = "colourClash_colorOfDay_date";
     return localStorage.getItem(key) === new Date().toDateString();
@@ -1362,23 +1345,6 @@ function ColorOfDayBanner({
       </div>
       <div style={{ borderTop: "0.5px solid oklch(var(--border))" }} />
       <div className="px-4 py-2.5">
-        {onTryColor && (
-          <button
-            type="button"
-            onClick={() => {
-              onTryColor(color.hex, color.name);
-              handleDismiss();
-            }}
-            className="mb-2 w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
-            style={{
-              background: `linear-gradient(135deg, ${color.hex}ee 0%, ${color.hex}99 100%)`,
-            }}
-            data-ocid="scanner.primary_button"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Try this color →
-          </button>
-        )}
         <p className="text-[10px] text-muted-foreground mb-2">
           Quick shop in {color.name}:
         </p>
@@ -1396,514 +1362,6 @@ function ColorOfDayBanner({
             </a>
           ))}
         </div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Style Streak Badge ───────────────────────────────────────────────────
-function StyleStreakBadge() {
-  const [streak, setStreak] = useState<number>(0);
-
-  useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const lastVisit = localStorage.getItem("cc_last_visit");
-    const currentStreak = Number(
-      localStorage.getItem("cc_style_streak") || "0",
-    );
-
-    if (lastVisit === today) {
-      setStreak(currentStreak);
-    } else {
-      const yesterday = new Date(Date.now() - 86400000)
-        .toISOString()
-        .slice(0, 10);
-      const newStreak = lastVisit === yesterday ? currentStreak + 1 : 1;
-      localStorage.setItem("cc_style_streak", String(newStreak));
-      localStorage.setItem("cc_last_visit", today);
-      setStreak(newStreak);
-    }
-  }, []);
-
-  const label =
-    streak >= 7
-      ? `🔥 ${streak}-day streak — Style Master!`
-      : streak >= 3
-        ? `🔥 ${streak}-day streak — You're on fire!`
-        : streak >= 2
-          ? `🔥 ${streak}-day streak — Keep it up!`
-          : "Welcome back! Start your streak 🔥";
-
-  return (
-    <motion.div
-      className="flex justify-center"
-      initial={{ scale: 0.7, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 500, damping: 25, delay: 0.15 }}
-    >
-      <div
-        className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-white text-[11px] font-bold shadow-md"
-        style={{
-          background: "linear-gradient(135deg, #FF6B35 0%, #FF9F1C 100%)",
-        }}
-        data-ocid="scanner.card"
-      >
-        <Flame className="w-3.5 h-3.5 flex-shrink-0" />
-        <span>{label}</span>
-      </div>
-    </motion.div>
-  );
-}
-
-// ── Daily Style Challenge ─────────────────────────────────────────────────
-const DAILY_CHALLENGES = [
-  {
-    title: "Dusty Rose Day",
-    hex: "#DCAE96",
-    desc: "Build a head-to-toe look in dusty rose tones",
-    badge: "🌸",
-    gender: "female",
-  },
-  {
-    title: "Navy Commander",
-    hex: "#000080",
-    desc: "Command the room in sharp navy coordinates",
-    badge: "⚓",
-    gender: "male",
-  },
-  {
-    title: "Sage & Sand Edit",
-    hex: "#87AE73",
-    desc: "Pair sage green with sandy neutrals",
-    badge: "🌿",
-    gender: "all",
-  },
-  {
-    title: "Crimson Strike",
-    hex: "#DC143C",
-    desc: "Make a bold statement in crimson red",
-    badge: "🔴",
-    gender: "all",
-  },
-  {
-    title: "Ivory Elegance",
-    hex: "#FFFFF0",
-    desc: "Pure and polished — all ivory everything",
-    badge: "🤍",
-    gender: "all",
-  },
-  {
-    title: "Cobalt Power",
-    hex: "#0047AB",
-    desc: "Cobalt blue for a high-energy power look",
-    badge: "💙",
-    gender: "all",
-  },
-  {
-    title: "Terracotta Vibes",
-    hex: "#E2725B",
-    desc: "Earthy terracotta — warm and sun-kissed",
-    badge: "🏺",
-    gender: "all",
-  },
-  {
-    title: "Mustard Magic",
-    hex: "#FFDB58",
-    desc: "Golden mustard for a sunny, joyful outfit",
-    badge: "🌻",
-    gender: "all",
-  },
-  {
-    title: "Forest Escape",
-    hex: "#228B22",
-    desc: "Go deep forest green for a nature-inspired look",
-    badge: "🌲",
-    gender: "all",
-  },
-  {
-    title: "Lilac Dream",
-    hex: "#C8A2C8",
-    desc: "Soft lilac for a dreamy, romantic ensemble",
-    badge: "💜",
-    gender: "female",
-  },
-  {
-    title: "Charcoal Sharp",
-    hex: "#36454F",
-    desc: "Charcoal grey — sleek, sharp, unstoppable",
-    badge: "🖤",
-    gender: "male",
-  },
-  {
-    title: "Coral Sunset",
-    hex: "#FF7F50",
-    desc: "Warm coral for a sunset-ready outfit",
-    badge: "🌅",
-    gender: "all",
-  },
-  {
-    title: "Plum Royale",
-    hex: "#DDA0DD",
-    desc: "Rich plum tones for a regal look",
-    badge: "👑",
-    gender: "all",
-  },
-  {
-    title: "Caramel Luxe",
-    hex: "#C68642",
-    desc: "Warm caramel — luxurious and effortless",
-    badge: "☕",
-    gender: "all",
-  },
-  {
-    title: "Teal Confidence",
-    hex: "#008080",
-    desc: "Bold teal for a confident, standout look",
-    badge: "🦚",
-    gender: "all",
-  },
-  {
-    title: "Powder Blue Chill",
-    hex: "#B0C4DE",
-    desc: "Relaxed powder blue for casual cool vibes",
-    badge: "🩵",
-    gender: "all",
-  },
-  {
-    title: "Blush & Gold",
-    hex: "#FFB6C1",
-    desc: "Delicate blush with gold accessories",
-    badge: "✨",
-    gender: "female",
-  },
-  {
-    title: "Midnight Edit",
-    hex: "#191970",
-    desc: "All-midnight — mysterious and magnetic",
-    badge: "🌙",
-    gender: "all",
-  },
-  {
-    title: "Jade Fresh",
-    hex: "#00A86B",
-    desc: "Fresh jade green for a clean, modern look",
-    badge: "💚",
-    gender: "all",
-  },
-  {
-    title: "Berry Bold",
-    hex: "#8E2D56",
-    desc: "Deep berry — unapologetically bold",
-    badge: "🍇",
-    gender: "all",
-  },
-  {
-    title: "Warm Sand Story",
-    hex: "#C2B280",
-    desc: "Sandy warm tones for a beachy, breezy outfit",
-    badge: "🏖️",
-    gender: "all",
-  },
-  {
-    title: "Electric Blue",
-    hex: "#7DF9FF",
-    desc: "Go electric — bright, futuristic, fearless",
-    badge: "⚡",
-    gender: "all",
-  },
-  {
-    title: "Olive Street",
-    hex: "#808000",
-    desc: "Olive green streetwear — rugged and cool",
-    badge: "🪖",
-    gender: "male",
-  },
-  {
-    title: "Rose Gold Hour",
-    hex: "#B76E79",
-    desc: "Rose gold for a glamorous, glowing look",
-    badge: "🌹",
-    gender: "female",
-  },
-  {
-    title: "Sky High",
-    hex: "#87CEEB",
-    desc: "Sky blue — light, airy, and confident",
-    badge: "☁️",
-    gender: "all",
-  },
-  {
-    title: "Burgundy Evening",
-    hex: "#800020",
-    desc: "Deep burgundy for a sophisticated evening look",
-    badge: "🍷",
-    gender: "all",
-  },
-  {
-    title: "Pastel Splash",
-    hex: "#FFD1DC",
-    desc: "Mix soft pastels for a playful, fresh feel",
-    badge: "🎨",
-    gender: "all",
-  },
-  {
-    title: "Graphite Edge",
-    hex: "#6B6B6B",
-    desc: "Graphite grey — minimal, edgy, modern",
-    badge: "⚙️",
-    gender: "male",
-  },
-  {
-    title: "Champagne Toast",
-    hex: "#F7E7CE",
-    desc: "Champagne tones for a celebration-ready look",
-    badge: "🥂",
-    gender: "all",
-  },
-  {
-    title: "Peacock Statement",
-    hex: "#005F6B",
-    desc: "Deep peacock blue-green — bold and distinctive",
-    badge: "🦚",
-    gender: "all",
-  },
-];
-
-function getTodaysChallenge(gender: string) {
-  const dayIdx = new Date().getDate() % DAILY_CHALLENGES.length;
-  const base = DAILY_CHALLENGES[dayIdx];
-  // Find gender-relevant challenge starting from today's index
-  for (let i = 0; i < DAILY_CHALLENGES.length; i++) {
-    const c = DAILY_CHALLENGES[(dayIdx + i) % DAILY_CHALLENGES.length];
-    if (
-      c.gender === "all" ||
-      c.gender === (gender === "male" ? "male" : "female")
-    ) {
-      return c;
-    }
-  }
-  return base;
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: kept for future use
-function DailyChallengeCard({ userGender }: { userGender: string }) {
-  const today = new Date().toDateString();
-  const challenge = getTodaysChallenge(userGender);
-  const storageKey = "cc_challenge_complete";
-
-  const [completed, setCompleted] = useState<{
-    date: string;
-    score: number;
-  } | null>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      return parsed.date === today ? parsed : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [dismissed, setDismissed] = useState(() => {
-    const d = localStorage.getItem("cc_challenge_dismissed");
-    return d === today;
-  });
-
-  // Check lookbook for today's score on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const todayStr = new Date().toDateString();
-    try {
-      const lookbook = JSON.parse(
-        localStorage.getItem("cc_lookbook") || "[]",
-      ) as Array<{ date: string; score: number }>;
-      const todayEntry = lookbook.find((e) =>
-        e.date?.startsWith(new Date().toISOString().slice(0, 10)),
-      );
-      if (todayEntry) {
-        const result = { date: todayStr, score: todayEntry.score };
-        setCompleted(result);
-        localStorage.setItem(storageKey, JSON.stringify(result));
-      }
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally runs once on mount
-
-  const handleShareChallenge = async () => {
-    if (!completed) return;
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 800;
-      canvas.height = 450;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      // Background gradient
-      const grad = ctx.createLinearGradient(0, 0, 800, 450);
-      grad.addColorStop(0, challenge.hex);
-      grad.addColorStop(1, "#1a1a2e");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 800, 450);
-
-      // Semi-transparent overlay
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      ctx.fillRect(0, 0, 800, 450);
-
-      // Challenge badge circle
-      ctx.beginPath();
-      ctx.arc(400, 160, 80, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.15)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Score
-      ctx.fillStyle = "#87CEEB";
-      ctx.font = "bold 64px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText(`${completed.score}`, 400, 185);
-
-      // Labels
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 28px Arial";
-      ctx.fillText(`${challenge.badge} ${challenge.title}`, 400, 260);
-      ctx.font = "18px Arial";
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.fillText("Challenge Complete!", 400, 295);
-
-      ctx.font = "bold 22px Arial";
-      ctx.fillStyle = "#FFD700";
-      ctx.fillText("COLOUR CLASH", 400, 350);
-      ctx.font = "14px Arial";
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.fillText("colourclash-emb.caffeine.xyz", 400, 375);
-
-      const caption = `I completed the ${challenge.title} Challenge! Score: ${completed.score}/100. Can you beat me? ${challenge.badge} #ColourClash`;
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "colour-clash-challenge.png";
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Challenge card downloaded! Share it with friends 🏆");
-        navigator.clipboard.writeText(caption).catch(() => {});
-      }, "image/png");
-    } catch (_e) {
-      toast.error("Could not generate share card");
-    }
-  };
-
-  if (dismissed) return null;
-
-  return (
-    <motion.div
-      className="ios-card overflow-hidden"
-      initial={{ opacity: 0, y: -12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -12, scale: 0.97 }}
-      transition={{ type: "spring", stiffness: 360, damping: 30 }}
-      data-ocid="scanner.card"
-    >
-      {/* Color strip at top */}
-      <div
-        className="h-1.5"
-        style={{
-          background: `linear-gradient(90deg, ${challenge.hex}, ${challenge.hex}99)`,
-        }}
-      />
-
-      <div className="px-4 py-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-lg border-2 border-white/20"
-              style={{ backgroundColor: challenge.hex }}
-            >
-              {challenge.badge}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                  Today's Challenge
-                </span>
-                {completed && (
-                  <span className="text-[9px] bg-green-500/20 text-green-700 dark:text-green-400 font-bold rounded-full px-1.5 py-0.5">
-                    ✅ Done
-                  </span>
-                )}
-              </div>
-              <p className="text-sm font-black text-foreground">
-                {challenge.title}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("cc_challenge_dismissed", today);
-              setDismissed(true);
-            }}
-            className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 mt-0.5"
-            data-ocid="scanner.close_button"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-          {challenge.desc}
-        </p>
-
-        {completed ? (
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-green-50 dark:bg-green-950/30 rounded-xl px-3 py-2 flex items-center gap-2">
-              <span
-                className="text-2xl font-black"
-                style={{ color: "#87CEEB" }}
-              >
-                {completed.score}
-              </span>
-              <div>
-                <p className="text-xs font-bold text-foreground">Your Score</p>
-                <p className="text-[10px] text-muted-foreground">
-                  Challenge complete!
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleShareChallenge}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
-              style={{
-                background: "linear-gradient(135deg, #9966cc 0%, #483d8b 100%)",
-              }}
-              data-ocid="scanner.secondary_button"
-            >
-              <Share2 className="w-3 h-3" />
-              Share
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() =>
-              toast.info("Go to the Score tab to complete your challenge! ⭐", {
-                duration: 4000,
-              })
-            }
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
-            style={{
-              background: `linear-gradient(135deg, ${challenge.hex}ee 0%, ${challenge.hex}88 100%)`,
-            }}
-            data-ocid="scanner.primary_button"
-          >
-            🏆 Accept & Score
-          </button>
-        )}
       </div>
     </motion.div>
   );
@@ -2037,60 +1495,6 @@ function getMoodKeyword(mood: string, occasion: string): string {
   return parts.join(" ");
 }
 
-// ── Palette Shop Links ────────────────────────────────────────────────────
-function buildPaletteShopLinks(
-  colorName: string,
-  _colorHex: string,
-  gender: string,
-  _age: string,
-) {
-  const genderParam =
-    gender === "male" ? "men" : gender === "female" ? "women" : "";
-  const encoded = encodeURIComponent(colorName);
-  return [
-    {
-      name: "House of Indya",
-      url: "https://www.houseofindya.com/Colourclash",
-      icon: "🏮",
-    },
-    {
-      name: "Amazon",
-      url: `https://www.amazon.in/s?k=${encoded}+${genderParam}+clothing&tag=colourclash-21`,
-      icon: "📦",
-    },
-    {
-      name: "Myntra",
-      url: `https://www.myntra.com/${genderParam ? `${genderParam}-` : ""}clothing?rawQuery=${encoded}`,
-      icon: "🛍️",
-    },
-    {
-      name: "Flipkart",
-      url: `https://www.flipkart.com/search?q=${encoded}+${genderParam}+clothing`,
-      icon: "🔷",
-    },
-    {
-      name: "Ajio",
-      url: `https://www.ajio.com/search/?text=${encoded}`,
-      icon: "✨",
-    },
-    {
-      name: "Meesho",
-      url: `https://www.meesho.com/search?q=${encoded}+${genderParam}`,
-      icon: "🌸",
-    },
-    {
-      name: "Nykaa",
-      url: `https://www.nykaafashion.com/search/result/?q=${encoded}`,
-      icon: "💄",
-    },
-    {
-      name: "Offduty India",
-      url: `https://offduty.in/search?q=${encoded}`,
-      icon: "🎨",
-    },
-  ];
-}
-
 export default function ScannerPage() {
   const [lockedColor, setLockedColor] = useState<string | null>(null);
   const [detectedColor, setDetectedColor] = useState<string>("#808080");
@@ -2166,20 +1570,21 @@ export default function ScannerPage() {
     : [];
 
   const [cameraStarted, setCameraStarted] = useState(false);
-  const [scannerTab, setScannerTab] = useState<"live" | "upload" | "camera">(
-    "live",
-  );
+  const [detectedColors, setDetectedColors] = useState<{
+    colors: Array<{ hex: string; name: string }>;
+    breakdown: string;
+    count: number;
+  } | null>(null);
+  const [reticlePos, setReticlePos] = useState<{ x: number; y: number }>({
+    x: 0.5,
+    y: 0.5,
+  });
+  const imageReticlePos = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+  const isDraggingReticle = useRef(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedMime, setUploadedMime] = useState<string>("image/jpeg");
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [detectedGarmentInfo, setDetectedGarmentInfo] =
-    useState<GarmentDetectionResult | null>(null);
+  const [scannerTab, setScannerTab] = useState<"live" | "upload">("live");
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [showPalette, setShowPalette] = useState(false);
-  const [activePaletteSwatch, setActivePaletteSwatch] = useState<string | null>(
-    null,
-  );
 
   useEffect(() => {
     detectedColorRef.current = detectedColor;
@@ -2197,13 +1602,13 @@ export default function ScannerPage() {
       const video = videoRef.current;
       const canvas = samplingCanvasRef.current;
       if (!video || !canvas || lockedColor) return;
-      const color = sampleVideoColor(video, canvas);
+      const color = sampleVideoColor(video, canvas, reticlePos);
       if (color) setDetectedColor(color);
     }, 500);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isActive, lockedColor, videoRef]);
+  }, [isActive, lockedColor, videoRef, reticlePos]);
 
   useEffect(() => {
     if (harmonyData) setLocalAdvice(harmonyData);
@@ -2219,28 +1624,6 @@ export default function ScannerPage() {
       setAiConnected(false);
     }
   }, [selectedAI]);
-
-  // Outfit Tip of the Day — show once per session on first lock
-  useEffect(() => {
-    if (!lockedColor) return;
-    const tipShown = sessionStorage.getItem("cc_tip_shown");
-    if (tipShown) return;
-    sessionStorage.setItem("cc_tip_shown", "1");
-    const family = getColorFamily(lockedColor);
-    const tips: Record<string, string> = {
-      warm: "Warm tones pair beautifully with camel, ivory, and gold accessories.",
-      cool: "Cool hues look stunning with silver jewelry and white sneakers.",
-      neutral:
-        "Neutrals are your canvas — add one bold accessory to elevate the look.",
-      dark: "Dark colors create slimming silhouettes. Try a light scarf for contrast.",
-      light:
-        "Light colors radiate freshness. Ground the look with tan leather shoes.",
-    };
-    const tipText =
-      tips[family] ??
-      "Layer this color with a neutral top for a complete outfit.";
-    toast("💡 Style Tip", { description: tipText, duration: 5000 });
-  }, [lockedColor]);
 
   const handleLockColor = useCallback(() => {
     if (lockedColor) {
@@ -2287,65 +1670,6 @@ export default function ScannerPage() {
     setSelectedMatchingColor(null);
     toast.info(`Loaded: ${hexToColorName(hex)}`);
   }, []);
-
-  const handleImageProcess = useCallback(
-    async (base64: string, mime: string) => {
-      setUploadedImage(base64);
-      setUploadedMime(mime);
-      setIsDetecting(true);
-      setDetectedGarmentInfo(null);
-      try {
-        const result = await detectGarmentFromImage(base64, mime);
-        setDetectedGarmentInfo(result);
-        // Auto-lock the detected color
-        const hex = result.colorHex;
-        setLockedColor(hex);
-        setDetectedColor(hex);
-        setAdviceHex(hex);
-        setLocalAdvice(generateLocalHarmonyPalette(hex));
-        // Auto-select garment
-        const match =
-          GARMENT_TYPES.find(
-            (g) => g.label.toLowerCase() === result.garmentType.toLowerCase(),
-          ) ??
-          GARMENT_TYPES.find((g) =>
-            g.label.toLowerCase().includes(result.garmentType.toLowerCase()),
-          );
-        if (match) setSelectedGarment(match);
-        toast.success(`Detected: ${result.colorName} ${result.garmentType}`);
-      } catch {
-        toast.error("Detection failed. Please try again.");
-      } finally {
-        setIsDetecting(false);
-      }
-    },
-    [],
-  );
-
-  const handleFileInput = useCallback(
-    (file: File) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const base64 = dataUrl.split(",")[1];
-        const mime = file.type || "image/jpeg";
-        handleImageProcess(base64, mime);
-      };
-      reader.readAsDataURL(file);
-    },
-    [handleImageProcess],
-  );
-
-  const handleScannerTabChange = useCallback(
-    (tab: "live" | "upload" | "camera") => {
-      setScannerTab(tab);
-      if (tab === "live") {
-        setUploadedImage(null);
-        setDetectedGarmentInfo(null);
-      }
-    },
-    [],
-  );
 
   const getHarmonyStatus = (): {
     label: string;
@@ -2410,18 +1734,8 @@ export default function ScannerPage() {
     <div className="flex flex-col gap-5 pb-4">
       {/* ── Colour of the Day ── */}
       <AnimatePresence>
-        <ColorOfDayBanner
-          onTryColor={(hex, name) => {
-            setLockedColor(hex);
-            setAdviceHex(hex);
-            setLocalAdvice(generateLocalHarmonyPalette(hex));
-            toast.success(`🎨 ${name} locked as today's color!`);
-          }}
-        />
+        <ColorOfDayBanner />
       </AnimatePresence>
-
-      {/* ── Style Streak ── */}
-      <StyleStreakBadge />
 
       {/* ── Filters (Collapsible) ── */}
       <motion.div
@@ -2653,7 +1967,7 @@ export default function ScannerPage() {
           );
         })()}
 
-      {/* ── Camera Card ── */}
+      {/* Scanner Card */}
       <motion.div
         className="ios-card shadow-2xl overflow-hidden"
         style={{ boxShadow: "0 20px 60px -10px oklch(0 0 0 / 0.6)" }}
@@ -2661,36 +1975,30 @@ export default function ScannerPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 350, damping: 30 }}
       >
-        {/* ── 3-Tab Scanner Bar ── */}
-        <div
-          className="flex items-center gap-1 p-2"
-          style={{ borderBottom: "0.5px solid oklch(var(--border))" }}
-        >
-          {(
-            [
-              { id: "live" as const, label: "Live Scan", Icon: ScanLine },
-              { id: "upload" as const, label: "Upload Photo", Icon: Upload },
-              { id: "camera" as const, label: "Take Photo", Icon: Camera },
-            ] as const
-          ).map(({ id, label, Icon }) => (
+        {/* Scanner tabs */}
+        <div className="flex border-b border-border/50">
+          {(["live", "upload"] as const).map((tab) => (
             <button
-              key={id}
+              key={tab}
               type="button"
-              onClick={() => handleScannerTabChange(id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-semibold transition-all ${
-                scannerTab === id
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted"
+              onClick={() => {
+                setScannerTab(tab);
+                if (tab === "live") {
+                  setUploadedImage(null);
+                  setDetectedColors(null);
+                }
+              }}
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
+                scannerTab === tab
+                  ? "text-primary border-b-2 border-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               data-ocid="scanner.tab"
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{label}</span>
+              {tab === "live" ? "Live Scan" : "Upload Photo"}
             </button>
           ))}
         </div>
-
-        {/* Hidden file inputs */}
         <input
           ref={uploadInputRef}
           type="file"
@@ -2698,24 +2006,239 @@ export default function ScannerPage() {
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) handleFileInput(file);
-            e.target.value = "";
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const dataUrl = ev.target?.result as string;
+              const base64 = dataUrl.split(",")[1];
+              const mime = file.type || "image/jpeg";
+              setUploadedImage(base64);
+              setUploadedMime(mime);
+              setDetectedColors(null);
+              imageReticlePos.current = { x: 0.5, y: 0.5 };
+            };
+            reader.readAsDataURL(file);
           }}
         />
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFileInput(file);
-            e.target.value = "";
-          }}
-        />
-
-        {/* ── Live Color Scan Tab ── */}
+        {scannerTab === "upload" && (
+          <div className="p-4 space-y-3">
+            {!uploadedImage ? (
+              <button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center gap-3 py-12 rounded-2xl border-2 border-dashed transition-all"
+                style={{ borderColor: "oklch(var(--primary) / 0.4)" }}
+                data-ocid="scanner.upload_button"
+              >
+                <div className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center">
+                  <Camera className="w-8 h-8 text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-foreground">
+                    Upload a Photo
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Tap to choose from your gallery
+                  </p>
+                </div>
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div
+                  className="relative rounded-2xl overflow-hidden bg-muted/40 touch-none select-none"
+                  onPointerDown={(e) => {
+                    isDraggingReticle.current = true;
+                    (e.currentTarget as HTMLElement).setPointerCapture(
+                      e.pointerId,
+                    );
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const nx = Math.max(
+                      0.025,
+                      Math.min(0.975, (e.clientX - rect.left) / rect.width),
+                    );
+                    const ny = Math.max(
+                      0.025,
+                      Math.min(0.975, (e.clientY - rect.top) / rect.height),
+                    );
+                    imageReticlePos.current = { x: nx, y: ny };
+                    const img = e.currentTarget.querySelector(
+                      "img",
+                    ) as HTMLImageElement | null;
+                    if (img) {
+                      const offCanvas = document.createElement("canvas");
+                      offCanvas.width = img.naturalWidth || img.width;
+                      offCanvas.height = img.naturalHeight || img.height;
+                      const ctx2 = offCanvas.getContext("2d");
+                      if (ctx2) {
+                        ctx2.drawImage(img, 0, 0);
+                        const px = Math.floor(nx * offCanvas.width) - 30;
+                        const py = Math.floor(ny * offCanvas.height) - 30;
+                        const result = analyzeRegionColors(
+                          offCanvas,
+                          px,
+                          py,
+                          60,
+                          60,
+                        );
+                        setDetectedColors(result);
+                        if (result.colors.length > 0) {
+                          const dominant = result.colors[0].hex;
+                          setDetectedColor(dominant);
+                          setLockedColor(dominant);
+                          setAdviceHex(dominant);
+                        }
+                      }
+                    }
+                  }}
+                  onPointerMove={(e) => {
+                    if (!isDraggingReticle.current) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const nx = Math.max(
+                      0.025,
+                      Math.min(0.975, (e.clientX - rect.left) / rect.width),
+                    );
+                    const ny = Math.max(
+                      0.025,
+                      Math.min(0.975, (e.clientY - rect.top) / rect.height),
+                    );
+                    imageReticlePos.current = { x: nx, y: ny };
+                    const img = e.currentTarget.querySelector(
+                      "img",
+                    ) as HTMLImageElement | null;
+                    if (img) {
+                      const offCanvas = document.createElement("canvas");
+                      offCanvas.width = img.naturalWidth || img.width;
+                      offCanvas.height = img.naturalHeight || img.height;
+                      const ctx2 = offCanvas.getContext("2d");
+                      if (ctx2) {
+                        ctx2.drawImage(img, 0, 0);
+                        const px = Math.floor(nx * offCanvas.width) - 30;
+                        const py = Math.floor(ny * offCanvas.height) - 30;
+                        const result = analyzeRegionColors(
+                          offCanvas,
+                          px,
+                          py,
+                          60,
+                          60,
+                        );
+                        setDetectedColors(result);
+                        if (result.colors.length > 0) {
+                          const dominant = result.colors[0].hex;
+                          setDetectedColor(dominant);
+                          setLockedColor(dominant);
+                          setAdviceHex(dominant);
+                        }
+                      }
+                    }
+                  }}
+                  onPointerUp={() => {
+                    isDraggingReticle.current = false;
+                  }}
+                >
+                  <img
+                    src={`data:${uploadedMime};base64,${uploadedImage}`}
+                    alt="Uploaded outfit"
+                    className="w-full object-contain"
+                    style={{ maxHeight: 320 }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: `calc(${imageReticlePos.current.x * 100}% - 30px)`,
+                      top: `calc(${imageReticlePos.current.y * 100}% - 30px)`,
+                      width: 60,
+                      height: 60,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: 12,
+                        height: 12,
+                        borderTop: "2.5px solid white",
+                        borderLeft: "2.5px solid white",
+                        filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderTop: "2.5px solid white",
+                        borderRight: "2.5px solid white",
+                        filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        width: 12,
+                        height: 12,
+                        borderBottom: "2.5px solid white",
+                        borderLeft: "2.5px solid white",
+                        filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderBottom: "2.5px solid white",
+                        borderRight: "2.5px solid white",
+                        filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        width: 3,
+                        height: 3,
+                        marginTop: -1.5,
+                        marginLeft: -1.5,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                      }}
+                    />
+                  </div>
+                  <div
+                    className="absolute bottom-2 left-1/2 -translate-x-1/2 text-white text-[10px] font-medium px-2 py-0.5 rounded-full"
+                    style={{
+                      background: "rgba(0,0,0,0.5)",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    Drag to sample colours
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadedImage(null);
+                    setDetectedColors(null);
+                    setLockedColor(null);
+                  }}
+                  className="w-full py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-border/60 hover:bg-muted transition-colors"
+                  data-ocid="scanner.secondary_button"
+                >
+                  Remove Photo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {scannerTab === "live" && (
           <div className="relative w-full" style={{ aspectRatio: "4/3" }}>
             <video
@@ -2734,8 +2257,119 @@ export default function ScannerPage() {
                 <div className="camera-corner camera-corner-tr" />
                 <div className="camera-corner camera-corner-bl" />
                 <div className="camera-corner camera-corner-br" />
-                <div className="reticle-ring animate-pulse" />
-                <div className="reticle-dot" />
+                <div
+                  className="absolute inset-0 touch-none"
+                  onPointerDown={(e) => {
+                    isDraggingReticle.current = true;
+                    (e.currentTarget as HTMLElement).setPointerCapture(
+                      e.pointerId,
+                    );
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const nx = Math.max(
+                      0,
+                      Math.min(1, (e.clientX - rect.left) / rect.width),
+                    );
+                    const ny = Math.max(
+                      0,
+                      Math.min(1, (e.clientY - rect.top) / rect.height),
+                    );
+                    setReticlePos({ x: nx, y: ny });
+                  }}
+                  onPointerMove={(e) => {
+                    if (!isDraggingReticle.current) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const nx = Math.max(
+                      0,
+                      Math.min(1, (e.clientX - rect.left) / rect.width),
+                    );
+                    const ny = Math.max(
+                      0,
+                      Math.min(1, (e.clientY - rect.top) / rect.height),
+                    );
+                    setReticlePos({ x: nx, y: ny });
+                  }}
+                  onPointerUp={() => {
+                    isDraggingReticle.current = false;
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: `calc(${reticlePos.x * 100}% - 30px)`,
+                      top: `calc(${reticlePos.y * 100}% - 30px)`,
+                      width: 60,
+                      height: 60,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: 12,
+                        height: 12,
+                        borderTop: "2.5px solid white",
+                        borderLeft: "2.5px solid white",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderTop: "2.5px solid white",
+                        borderRight: "2.5px solid white",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        width: 12,
+                        height: 12,
+                        borderBottom: "2.5px solid white",
+                        borderLeft: "2.5px solid white",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderBottom: "2.5px solid white",
+                        borderRight: "2.5px solid white",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "50%",
+                        width: 3,
+                        height: 3,
+                        marginTop: -1.5,
+                        marginLeft: -1.5,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.8)",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div
+                  className="absolute bottom-2 left-1/2 -translate-x-1/2 text-white text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "rgba(0,0,0,0.5)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  Drag to target area
+                </div>
               </>
             )}
 
@@ -2828,227 +2462,6 @@ export default function ScannerPage() {
           </div>
         )}
 
-        {/* ── Upload Picture Tab ── */}
-        {scannerTab === "upload" && (
-          <div className="p-4 space-y-4">
-            {!uploadedImage ? (
-              <motion.button
-                type="button"
-                onClick={() => uploadInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-3 py-12 rounded-2xl border-2 border-dashed transition-all active:scale-97"
-                style={{ borderColor: "oklch(var(--primary) / 0.4)" }}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
-                data-ocid="scanner.upload_button"
-              >
-                <div className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center">
-                  <ImagePlus className="w-8 h-8 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-foreground">
-                    Upload a Photo
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Tap to choose from your gallery
-                  </p>
-                </div>
-              </motion.button>
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key="uploaded"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
-                  {/* Image preview */}
-                  <div className="relative rounded-2xl overflow-hidden bg-muted/40">
-                    <img
-                      src={`data:${uploadedMime};base64,${uploadedImage}`}
-                      alt="Uploaded outfit"
-                      className="w-full object-contain"
-                      style={{ maxHeight: 300 }}
-                    />
-                    {isDetecting && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
-                        <Loader2 className="w-9 h-9 text-white animate-spin" />
-                        <p className="text-white text-sm font-semibold">
-                          Analysing with AI…
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Detection result */}
-                  {detectedGarmentInfo && !isDetecting && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="rounded-2xl p-3 flex items-center gap-3"
-                      style={{
-                        background: "oklch(var(--primary) / 0.08)",
-                        border: "1px solid oklch(var(--primary) / 0.2)",
-                      }}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-full flex-shrink-0"
-                        style={{
-                          backgroundColor: detectedGarmentInfo.colorHex,
-                          boxShadow: `0 0 0 2px white, 0 0 0 4px ${detectedGarmentInfo.colorHex}`,
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          <p className="text-xs font-bold text-foreground">
-                            Detected:{" "}
-                            <span
-                              style={{ color: detectedGarmentInfo.colorHex }}
-                            >
-                              {detectedGarmentInfo.colorName}
-                            </span>{" "}
-                            {detectedGarmentInfo.garmentType}
-                          </p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Auto-selected in item selector below. You can change
-                          it if needed.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* Re-upload button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadedImage(null);
-                      setDetectedGarmentInfo(null);
-                    }}
-                    className="w-full py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-border/60 hover:bg-muted transition-colors"
-                    data-ocid="scanner.secondary_button"
-                  >
-                    Upload Different Photo
-                  </button>
-                </motion.div>
-              </AnimatePresence>
-            )}
-          </div>
-        )}
-
-        {/* ── Open Camera Tab ── */}
-        {scannerTab === "camera" && (
-          <div className="p-4 space-y-4">
-            {!uploadedImage ? (
-              <div className="flex flex-col items-center gap-4 py-10">
-                <motion.button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="w-24 h-24 rounded-full flex items-center justify-center text-white transition-all active:scale-95"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, oklch(0.55 0.22 250), oklch(0.48 0.20 260))",
-                    boxShadow: "0 8px 32px -6px oklch(0.55 0.22 250 / 0.5)",
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.93 }}
-                  data-ocid="scanner.primary_button"
-                >
-                  <Camera className="w-10 h-10" />
-                </motion.button>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-foreground">
-                    Take a Photo
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Opens your camera to capture outfit
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key="captured"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="space-y-3"
-                >
-                  {/* Image preview */}
-                  <div className="relative rounded-2xl overflow-hidden bg-muted/40">
-                    <img
-                      src={`data:${uploadedMime};base64,${uploadedImage}`}
-                      alt="Captured outfit"
-                      className="w-full object-contain"
-                      style={{ maxHeight: 300 }}
-                    />
-                    {isDetecting && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
-                        <Loader2 className="w-9 h-9 text-white animate-spin" />
-                        <p className="text-white text-sm font-semibold">
-                          Analysing with AI…
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Detection result */}
-                  {detectedGarmentInfo && !isDetecting && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="rounded-2xl p-3 flex items-center gap-3"
-                      style={{
-                        background: "oklch(var(--primary) / 0.08)",
-                        border: "1px solid oklch(var(--primary) / 0.2)",
-                      }}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-full flex-shrink-0"
-                        style={{
-                          backgroundColor: detectedGarmentInfo.colorHex,
-                          boxShadow: `0 0 0 2px white, 0 0 0 4px ${detectedGarmentInfo.colorHex}`,
-                        }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-500" />
-                          <p className="text-xs font-bold text-foreground">
-                            Detected:{" "}
-                            <span
-                              style={{ color: detectedGarmentInfo.colorHex }}
-                            >
-                              {detectedGarmentInfo.colorName}
-                            </span>{" "}
-                            {detectedGarmentInfo.garmentType}
-                          </p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Auto-selected in item selector below. You can change
-                          it if needed.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUploadedImage(null);
-                      setDetectedGarmentInfo(null);
-                    }}
-                    className="w-full py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-border/60 hover:bg-muted transition-colors"
-                    data-ocid="scanner.secondary_button"
-                  >
-                    Retake Photo
-                  </button>
-                </motion.div>
-              </AnimatePresence>
-            )}
-          </div>
-        )}
-
         {/* Color info bar */}
         <div
           className="flex items-center gap-3 px-4 py-3.5"
@@ -3081,6 +2494,54 @@ export default function ScannerPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Multi-colour breakdown from reticle */}
+      <AnimatePresence>
+        {detectedColors && (
+          <motion.div
+            className="ios-card px-4 py-3"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            data-ocid="scanner.card"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm">&#x1F3A8;</span>
+              <Badge variant="secondary" className="text-[10px] font-bold px-2">
+                {detectedColors.count} colour
+                {detectedColors.count !== 1 ? "s" : ""} detected
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground italic leading-snug">
+              {detectedColors.breakdown}
+            </p>
+            {detectedColors.colors.length > 1 && (
+              <div className="flex gap-2 mt-2">
+                {detectedColors.colors.map((c, i) => (
+                  <div
+                    key={`bd-${c.hex}-${i}`}
+                    className="flex flex-col items-center gap-1"
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full border border-border/40"
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    />
+                    <span
+                      className="text-[8px] text-muted-foreground leading-none text-center"
+                      style={{ maxWidth: 36 }}
+                    >
+                      {c.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {colorHistory.length > 0 && (
           <motion.div
@@ -3478,7 +2939,7 @@ export default function ScannerPage() {
           />
           <div className="flex-1">
             <h2 className="font-display font-bold text-sm text-foreground">
-              10 Matching Colours
+              Matching Colours
             </h2>
             <p className="text-[11px] text-muted-foreground">
               Color harmony palette
@@ -3526,6 +2987,59 @@ export default function ScannerPage() {
             </AnimatePresence>
           </div>
 
+          {detectedColors && detectedColors.colors.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-2">
+                Detected in target area
+              </p>
+              <div className="grid grid-cols-5 gap-3">
+                {detectedColors.colors.map((mc, i) => {
+                  const isDSel = selectedMatchingColor?.hex === mc.hex;
+                  return (
+                    <motion.button
+                      key={`det-${mc.hex}-${i}`}
+                      type="button"
+                      onClick={() =>
+                        setSelectedMatchingColor(isDSel ? null : mc)
+                      }
+                      className="flex flex-col items-center gap-2 focus:outline-none"
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.93 }}
+                      transition={{
+                        delay: i * 0.04,
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 28,
+                      }}
+                      data-ocid={`scanner.item.${i + 1}`}
+                    >
+                      <motion.div
+                        className="w-12 h-12 rounded-full"
+                        style={{
+                          backgroundColor: mc.hex,
+                          boxShadow: isDSel
+                            ? `0 0 0 3px white, 0 0 0 5px ${mc.hex}`
+                            : "0 4px 12px -2px oklch(0.42 0.22 255 / 0.25), 0 0 0 1.5px oklch(var(--border))",
+                        }}
+                        animate={{ scale: isDSel ? 1.15 : 1 }}
+                      />
+                      <span
+                        className="text-[9px] text-muted-foreground font-medium text-center leading-tight"
+                        style={{ maxWidth: 52 }}
+                      >
+                        {mc.name}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Suggested combinations
+          </p>
           <div className="grid grid-cols-5 gap-3">
             {matchingColors.map((mc, i) => {
               const isSelected = selectedMatchingColor?.hex === mc.hex;
@@ -3587,175 +3101,6 @@ export default function ScannerPage() {
           <p className="text-[10px] text-center text-muted-foreground/70 mt-1">
             Tap a color to refresh shop links
           </p>
-
-          {/* ✨ Quick Colour Palette Generator */}
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={() => setShowPalette((v) => !v)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl py-2.5 text-xs font-bold text-white transition-all active:scale-95 hover:opacity-90"
-              style={{
-                background: "linear-gradient(135deg, #9966cc 0%, #483d8b 100%)",
-              }}
-              data-ocid="scanner.secondary_button"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              {showPalette
-                ? "Hide Outfit Palette"
-                : "✨ Generate Full Outfit Palette"}
-            </button>
-
-            <AnimatePresence>
-              {showPalette &&
-                (() => {
-                  const [h, s, l] = hexToHsl(activeColor);
-                  // Fix: ensure visually distinct swatches even for greys/whites/blacks
-                  const sBase = s < 0.1 ? 0.55 : s;
-                  const lBase = l < 0.15 ? 0.35 : l > 0.85 ? 0.65 : l;
-                  const compHex = hslToHex(
-                    (h + 180) % 360,
-                    sBase,
-                    lBase > 0.5 ? lBase - 0.15 : lBase + 0.15,
-                  );
-                  const tri1Hex = hslToHex(
-                    (h + 120) % 360,
-                    sBase * 0.9,
-                    Math.min(0.75, lBase + 0.1),
-                  );
-                  const tri2Hex = hslToHex(
-                    (h + 240) % 360,
-                    sBase * 0.85,
-                    Math.max(0.25, lBase - 0.1),
-                  );
-                  const neutralHex = hslToHex(h, 0.08, 0.88); // always near-white neutral
-                  const swatches = [
-                    { hex: activeColor, label: "Primary" },
-                    { hex: compHex, label: "Complement" },
-                    { hex: tri1Hex, label: "Triadic 1" },
-                    { hex: tri2Hex, label: "Triadic 2" },
-                    { hex: neutralHex, label: "Neutral" },
-                  ];
-                  return (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 340,
-                        damping: 30,
-                      }}
-                      className="overflow-hidden"
-                    >
-                      <div className="creamy-card mt-2 p-3">
-                        <div className="flex items-center justify-between mb-2.5">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                            Your Outfit Palette
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const hexList = swatches
-                                .map((s) => s.hex)
-                                .join(", ");
-                              navigator.clipboard
-                                .writeText(hexList)
-                                .then(() =>
-                                  toast.success("Palette copied! ✨"),
-                                );
-                            }}
-                            className="flex items-center gap-1 text-[9px] font-semibold text-primary hover:opacity-70 transition-opacity"
-                            data-ocid="scanner.secondary_button"
-                          >
-                            <ClipboardCopy className="w-3 h-3" />
-                            Copy Palette
-                          </button>
-                        </div>
-                        <div className="flex justify-between gap-1">
-                          {swatches.map((sw) => {
-                            const isSwatchActive =
-                              activePaletteSwatch === sw.hex;
-                            return (
-                              <div
-                                key={sw.hex}
-                                className="flex flex-col items-center gap-1 flex-1"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActivePaletteSwatch(
-                                      isSwatchActive ? null : sw.hex,
-                                    )
-                                  }
-                                  className="flex flex-col items-center gap-1 focus:outline-none transition-transform active:scale-90"
-                                  title={`Shop ${getColorName(sw.hex)}`}
-                                  data-ocid="scanner.toggle"
-                                >
-                                  <div
-                                    className="w-10 h-10 rounded-full border-2 shadow-md flex-shrink-0 transition-all"
-                                    style={{
-                                      backgroundColor: sw.hex,
-                                      boxShadow: isSwatchActive
-                                        ? `0 0 0 3px white, 0 0 0 5px ${sw.hex}, 0 4px 14px -2px ${sw.hex}88`
-                                        : `0 2px 8px ${sw.hex}55`,
-                                      borderColor: isSwatchActive
-                                        ? "white"
-                                        : "rgba(255,255,255,0.3)",
-                                    }}
-                                  />
-                                  <span className="text-[8px] text-muted-foreground font-medium text-center leading-tight line-clamp-2">
-                                    {sw.label}
-                                  </span>
-                                  <span className="text-[7px] font-mono text-muted-foreground/70">
-                                    {getColorName(sw.hex)}
-                                  </span>
-                                  <span className="text-[7px] text-primary/60 font-semibold">
-                                    {isSwatchActive ? "▲ shop" : "▼ shop"}
-                                  </span>
-                                </button>
-                                {isSwatchActive && (
-                                  <div
-                                    className="w-full mt-1 rounded-xl overflow-hidden border border-border/40"
-                                    style={{
-                                      background: "rgba(255,255,255,0.08)",
-                                    }}
-                                  >
-                                    <div className="flex flex-col gap-0.5 p-1">
-                                      {buildPaletteShopLinks(
-                                        getColorName(sw.hex),
-                                        sw.hex,
-                                        userGender,
-                                        selectedAge ?? "",
-                                      ).map((r) => (
-                                        <a
-                                          key={r.name}
-                                          href={r.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center gap-1 text-[8px] font-semibold text-foreground bg-muted/60 hover:bg-primary/10 rounded-lg px-1.5 py-1 transition-colors truncate"
-                                          data-ocid="scanner.link"
-                                        >
-                                          <span className="text-[9px]">
-                                            {r.icon}
-                                          </span>
-                                          <span className="truncate">
-                                            {r.name}
-                                          </span>
-                                        </a>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })()}
-            </AnimatePresence>
-          </div>
         </div>
       </motion.div>
       <AnimatePresence>

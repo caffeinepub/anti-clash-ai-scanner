@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   BookOpen,
   Heart,
-  HelpCircle,
+  Info,
   LogOut,
   ScanLine,
   Sparkles,
@@ -464,7 +464,7 @@ function AppContent() {
               title="How to use Colour Clash"
               data-ocid="nav.howto.button"
             >
-              <HelpCircle className="w-4 h-4" />
+              <Info className="w-4 h-4" />
             </button>
             <UserArea onProfileClick={() => setShowProfile(true)} />
           </div>

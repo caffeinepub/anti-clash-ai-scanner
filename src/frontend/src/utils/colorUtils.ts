@@ -1,3 +1,5 @@
+import { getColorName } from "../lib/colorNames";
+
 /**
  * Convert hex color to HSL
  */
@@ -123,10 +125,12 @@ export function normalizeHex(hex: string): string {
 
 /**
  * Sample color from video element via canvas
+ * @param reticleNorm - Optional normalized position {x, y} (0-1). Defaults to center.
  */
 export function sampleVideoColor(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
+  reticleNorm?: { x: number; y: number },
 ): string | null {
   if (!video || !canvas || video.readyState < 2) return null;
   const ctx = canvas.getContext("2d");
@@ -136,8 +140,10 @@ export function sampleVideoColor(
   canvas.height = video.videoHeight || 480;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const cx = Math.floor(canvas.width / 2);
-  const cy = Math.floor(canvas.height / 2);
+  const nx = reticleNorm?.x ?? 0.5;
+  const ny = reticleNorm?.y ?? 0.5;
+  const cx = Math.floor(nx * canvas.width);
+  const cy = Math.floor(ny * canvas.height);
   const data = ctx.getImageData(cx - 4, cy - 4, 8, 8).data;
 
   let r = 0;
@@ -160,6 +166,172 @@ export function sampleVideoColor(
     .toString(16)
     .padStart(2, "0");
   return `#${rr}${gg}${bb}`.toUpperCase();
+}
+
+/**
+ * Analyze a rectangular region on a canvas for multiple colors and patterns.
+ * Returns top distinct color clusters, a descriptive breakdown, and a count.
+ */
+export function analyzeRegionColors(
+  canvas: HTMLCanvasElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): {
+  colors: Array<{ hex: string; name: string }>;
+  breakdown: string;
+  count: number;
+} {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return { colors: [], breakdown: "Could not read colors", count: 0 };
+  }
+
+  // Clamp region to canvas bounds
+  const safeX = Math.max(0, Math.min(x, canvas.width - 1));
+  const safeY = Math.max(0, Math.min(y, canvas.height - 1));
+  const safeW = Math.min(w, canvas.width - safeX);
+  const safeH = Math.min(h, canvas.height - safeY);
+
+  if (safeW <= 0 || safeH <= 0) {
+    return { colors: [], breakdown: "Invalid region", count: 0 };
+  }
+
+  const imageData = ctx.getImageData(safeX, safeY, safeW, safeH);
+  const data = imageData.data;
+
+  // Sample every 4th pixel in both axes (~stride of 4)
+  const stride = 4;
+  const samples: Array<{
+    r: number;
+    g: number;
+    b: number;
+    h: number;
+    s: number;
+    l: number;
+  }> = [];
+
+  for (let py = 0; py < safeH; py += stride) {
+    for (let px = 0; px < safeW; px += stride) {
+      const idx = (py * safeW + px) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const rn = r / 255;
+      const gn = g / 255;
+      const bn = b / 255;
+
+      const max = Math.max(rn, gn, bn);
+      const min = Math.min(rn, gn, bn);
+      const lum = (max + min) / 2;
+
+      let hue = 0;
+      let sat = 0;
+      if (max !== min) {
+        const d = max - min;
+        sat = lum > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case rn:
+            hue = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+            break;
+          case gn:
+            hue = ((bn - rn) / d + 2) / 6;
+            break;
+          case bn:
+            hue = ((rn - gn) / d + 4) / 6;
+            break;
+        }
+      }
+      samples.push({ r, g, b, h: hue * 360, s: sat, l: lum });
+    }
+  }
+
+  if (samples.length === 0) {
+    return { colors: [], breakdown: "No pixels sampled", count: 0 };
+  }
+
+  // Cluster by HSL proximity
+  type Cluster = {
+    pixels: typeof samples;
+    sumR: number;
+    sumG: number;
+    sumB: number;
+  };
+  const clusters: Cluster[] = [];
+
+  for (const px of samples) {
+    let assigned = false;
+    for (const cluster of clusters) {
+      const rep = cluster.pixels[0];
+      const hDiff = Math.min(
+        Math.abs(px.h - rep.h),
+        360 - Math.abs(px.h - rep.h),
+      );
+      const sDiff = Math.abs(px.s - rep.s);
+      const lDiff = Math.abs(px.l - rep.l);
+      if (hDiff < 30 && sDiff < 0.25 && lDiff < 0.25) {
+        cluster.pixels.push(px);
+        cluster.sumR += px.r;
+        cluster.sumG += px.g;
+        cluster.sumB += px.b;
+        assigned = true;
+        break;
+      }
+    }
+    if (!assigned) {
+      clusters.push({ pixels: [px], sumR: px.r, sumG: px.g, sumB: px.b });
+    }
+  }
+
+  const total = samples.length;
+  const minClusterSize = Math.floor(total * 0.05);
+
+  // Filter small clusters and sort by frequency
+  const significant = clusters
+    .filter((c) => c.pixels.length >= minClusterSize)
+    .sort((a, b) => b.pixels.length - a.pixels.length)
+    .slice(0, 5);
+
+  if (significant.length === 0) {
+    // All clusters too small — return the biggest one regardless
+    clusters.sort((a, b) => b.pixels.length - a.pixels.length);
+    significant.push(clusters[0]);
+  }
+
+  // Convert clusters to hex + name
+  const colors = significant.map((c) => {
+    const avgR = Math.round(c.sumR / c.pixels.length);
+    const avgG = Math.round(c.sumG / c.pixels.length);
+    const avgB = Math.round(c.sumB / c.pixels.length);
+    const rr = avgR.toString(16).padStart(2, "0");
+    const gg = avgG.toString(16).padStart(2, "0");
+    const bb = avgB.toString(16).padStart(2, "0");
+    const hex = `#${rr}${gg}${bb}`.toUpperCase();
+    return { hex, name: getColorName(hex) };
+  });
+
+  // Build human-readable breakdown
+  let breakdown = "";
+  if (colors.length === 1) {
+    breakdown = colors[0].name;
+  } else if (colors.length === 2) {
+    breakdown = `${colors[0].name} with ${colors[1].name} accents`;
+  } else if (colors.length === 3) {
+    breakdown = `${colors[0].name} and ${colors[1].name} with ${colors[2].name} highlights`;
+  } else {
+    const main = colors
+      .slice(0, 2)
+      .map((c) => c.name)
+      .join(" and ");
+    const accents = colors
+      .slice(2)
+      .map((c) => c.name)
+      .join(", ");
+    breakdown = `${main} with ${accents}`;
+  }
+
+  return { colors, breakdown, count: colors.length };
 }
 
 /**
