@@ -4,18 +4,22 @@ import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
   Camera,
+  Check,
   ClipboardCopy,
   Flame,
   Heart,
+  ImagePlus,
   Layers,
   LayoutGrid,
   Loader2,
   Lock,
   RefreshCw,
+  ScanLine,
   Share2,
   Shirt,
   ShoppingBag,
   Sparkles,
+  Upload,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -33,6 +37,10 @@ import {
   hexToHsl,
   sampleVideoColor,
 } from "../utils/colorUtils";
+import {
+  type GarmentDetectionResult,
+  detectGarmentFromImage,
+} from "../utils/geminiAI";
 
 // ── Garment detection ──────────────────────────────────────────────────────
 const GARMENT_TYPES = [
@@ -1677,6 +1685,7 @@ function getTodaysChallenge(gender: string) {
   return base;
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: kept for future use
 function DailyChallengeCard({ userGender }: { userGender: string }) {
   const today = new Date().toDateString();
   const challenge = getTodaysChallenge(userGender);
@@ -1702,7 +1711,7 @@ function DailyChallengeCard({ userGender }: { userGender: string }) {
   });
 
   // Check lookbook for today's score on mount
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional on-mount only check
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const todayStr = new Date().toDateString();
     try {
@@ -2028,6 +2037,60 @@ function getMoodKeyword(mood: string, occasion: string): string {
   return parts.join(" ");
 }
 
+// ── Palette Shop Links ────────────────────────────────────────────────────
+function buildPaletteShopLinks(
+  colorName: string,
+  _colorHex: string,
+  gender: string,
+  _age: string,
+) {
+  const genderParam =
+    gender === "male" ? "men" : gender === "female" ? "women" : "";
+  const encoded = encodeURIComponent(colorName);
+  return [
+    {
+      name: "House of Indya",
+      url: "https://www.houseofindya.com/Colourclash",
+      icon: "🏮",
+    },
+    {
+      name: "Amazon",
+      url: `https://www.amazon.in/s?k=${encoded}+${genderParam}+clothing&tag=colourclash-21`,
+      icon: "📦",
+    },
+    {
+      name: "Myntra",
+      url: `https://www.myntra.com/${genderParam ? `${genderParam}-` : ""}clothing?rawQuery=${encoded}`,
+      icon: "🛍️",
+    },
+    {
+      name: "Flipkart",
+      url: `https://www.flipkart.com/search?q=${encoded}+${genderParam}+clothing`,
+      icon: "🔷",
+    },
+    {
+      name: "Ajio",
+      url: `https://www.ajio.com/search/?text=${encoded}`,
+      icon: "✨",
+    },
+    {
+      name: "Meesho",
+      url: `https://www.meesho.com/search?q=${encoded}+${genderParam}`,
+      icon: "🌸",
+    },
+    {
+      name: "Nykaa",
+      url: `https://www.nykaafashion.com/search/result/?q=${encoded}`,
+      icon: "💄",
+    },
+    {
+      name: "Offduty India",
+      url: `https://offduty.in/search?q=${encoded}`,
+      icon: "🎨",
+    },
+  ];
+}
+
 export default function ScannerPage() {
   const [lockedColor, setLockedColor] = useState<string | null>(null);
   const [detectedColor, setDetectedColor] = useState<string>("#808080");
@@ -2103,7 +2166,20 @@ export default function ScannerPage() {
     : [];
 
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [scannerTab, setScannerTab] = useState<"live" | "upload" | "camera">(
+    "live",
+  );
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedMime, setUploadedMime] = useState<string>("image/jpeg");
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectedGarmentInfo, setDetectedGarmentInfo] =
+    useState<GarmentDetectionResult | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [showPalette, setShowPalette] = useState(false);
+  const [activePaletteSwatch, setActivePaletteSwatch] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     detectedColorRef.current = detectedColor;
@@ -2212,6 +2288,65 @@ export default function ScannerPage() {
     toast.info(`Loaded: ${hexToColorName(hex)}`);
   }, []);
 
+  const handleImageProcess = useCallback(
+    async (base64: string, mime: string) => {
+      setUploadedImage(base64);
+      setUploadedMime(mime);
+      setIsDetecting(true);
+      setDetectedGarmentInfo(null);
+      try {
+        const result = await detectGarmentFromImage(base64, mime);
+        setDetectedGarmentInfo(result);
+        // Auto-lock the detected color
+        const hex = result.colorHex;
+        setLockedColor(hex);
+        setDetectedColor(hex);
+        setAdviceHex(hex);
+        setLocalAdvice(generateLocalHarmonyPalette(hex));
+        // Auto-select garment
+        const match =
+          GARMENT_TYPES.find(
+            (g) => g.label.toLowerCase() === result.garmentType.toLowerCase(),
+          ) ??
+          GARMENT_TYPES.find((g) =>
+            g.label.toLowerCase().includes(result.garmentType.toLowerCase()),
+          );
+        if (match) setSelectedGarment(match);
+        toast.success(`Detected: ${result.colorName} ${result.garmentType}`);
+      } catch {
+        toast.error("Detection failed. Please try again.");
+      } finally {
+        setIsDetecting(false);
+      }
+    },
+    [],
+  );
+
+  const handleFileInput = useCallback(
+    (file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        const base64 = dataUrl.split(",")[1];
+        const mime = file.type || "image/jpeg";
+        handleImageProcess(base64, mime);
+      };
+      reader.readAsDataURL(file);
+    },
+    [handleImageProcess],
+  );
+
+  const handleScannerTabChange = useCallback(
+    (tab: "live" | "upload" | "camera") => {
+      setScannerTab(tab);
+      if (tab === "live") {
+        setUploadedImage(null);
+        setDetectedGarmentInfo(null);
+      }
+    },
+    [],
+  );
+
   const getHarmonyStatus = (): {
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
@@ -2287,11 +2422,6 @@ export default function ScannerPage() {
 
       {/* ── Style Streak ── */}
       <StyleStreakBadge />
-
-      {/* ── Daily Challenge ── */}
-      <AnimatePresence>
-        <DailyChallengeCard userGender={selectedGender} />
-      </AnimatePresence>
 
       {/* ── Filters (Collapsible) ── */}
       <motion.div
@@ -2525,121 +2655,399 @@ export default function ScannerPage() {
 
       {/* ── Camera Card ── */}
       <motion.div
-        className="ios-card shadow-2xl"
+        className="ios-card shadow-2xl overflow-hidden"
         style={{ boxShadow: "0 20px 60px -10px oklch(0 0 0 / 0.6)" }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 350, damping: 30 }}
       >
-        <div className="relative w-full" style={{ aspectRatio: "4/3" }}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
-          <canvas ref={canvasRef} className="hidden" />
-          <canvas ref={samplingCanvasRef} className="hidden" />
-
-          {isActive && (
-            <>
-              <div className="camera-corner camera-corner-tl" />
-              <div className="camera-corner camera-corner-tr" />
-              <div className="camera-corner camera-corner-bl" />
-              <div className="camera-corner camera-corner-br" />
-              <div className="reticle-ring animate-pulse" />
-              <div className="reticle-dot" />
-            </>
-          )}
-
-          {!cameraStarted && !isLoading && !isActive && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                <Camera className="w-8 h-8 text-primary" />
-              </div>
-              <p className="text-white/80 text-sm font-medium">
-                Tap to start scanning
-              </p>
-              <button
-                type="button"
-                data-ocid="scanner.primary_button"
-                onClick={() => {
-                  setCameraStarted(true);
-                  startCamera();
-                }}
-                className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
-              >
-                <Camera className="w-4 h-4" /> Start Scanner
-              </button>
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-9 h-9 text-primary animate-spin" />
-                <p className="text-sm text-foreground/70 font-medium">
-                  Starting camera…
-                </p>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-black/80"
-              data-ocid="scanner.error_state"
+        {/* ── 3-Tab Scanner Bar ── */}
+        <div
+          className="flex items-center gap-1 p-2"
+          style={{ borderBottom: "0.5px solid oklch(var(--border))" }}
+        >
+          {(
+            [
+              { id: "live" as const, label: "Live Scan", Icon: ScanLine },
+              { id: "upload" as const, label: "Upload Photo", Icon: Upload },
+              { id: "camera" as const, label: "Take Photo", Icon: Camera },
+            ] as const
+          ).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => handleScannerTabChange(id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-semibold transition-all ${
+                scannerTab === id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+              data-ocid="scanner.tab"
             >
-              <div className="flex flex-col items-center gap-4 p-6 text-center">
-                <p className="text-destructive font-semibold">
-                  {error.message}
+              <Icon className="w-3.5 h-3.5" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Hidden file inputs */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileInput(file);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileInput(file);
+            e.target.value = "";
+          }}
+        />
+
+        {/* ── Live Color Scan Tab ── */}
+        {scannerTab === "live" && (
+          <div className="relative w-full" style={{ aspectRatio: "4/3" }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            <canvas ref={canvasRef} className="hidden" />
+            <canvas ref={samplingCanvasRef} className="hidden" />
+
+            {isActive && (
+              <>
+                <div className="camera-corner camera-corner-tl" />
+                <div className="camera-corner camera-corner-tr" />
+                <div className="camera-corner camera-corner-bl" />
+                <div className="camera-corner camera-corner-br" />
+                <div className="reticle-ring animate-pulse" />
+                <div className="reticle-dot" />
+              </>
+            )}
+
+            {!cameraStarted && !isLoading && !isActive && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
+                  <Camera className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-white/80 text-sm font-medium">
+                  Tap to start scanning
                 </p>
                 <button
                   type="button"
-                  onClick={retry}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+                  data-ocid="scanner.primary_button"
+                  onClick={() => {
+                    setCameraStarted(true);
+                    startCamera();
+                  }}
+                  className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
                 >
-                  <RefreshCw className="w-4 h-4" /> Retry Camera
+                  <Camera className="w-4 h-4" /> Start Scanner
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {isSupported === false && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-              <p className="text-muted-foreground text-sm p-6 text-center">
-                Camera not supported in this browser
-              </p>
-            </div>
-          )}
+            {isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-9 h-9 text-primary animate-spin" />
+                  <p className="text-sm text-foreground/70 font-medium">
+                    Starting camera…
+                  </p>
+                </div>
+              </div>
+            )}
 
-          {isActive && (
-            <motion.div
-              className="absolute top-3 left-3 flex flex-col gap-2"
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <div className="flex items-center gap-2 ios-glass-light rounded-2xl px-3 py-2 border border-white/10">
-                <div
-                  className="w-4 h-4 rounded-full flex-shrink-0 swatch-shadow"
-                  style={{ backgroundColor: activeColor }}
-                />
-                <span className="text-xs font-mono text-foreground/90 uppercase tracking-tight">
-                  {activeColor}
-                </span>
-                {lockedColor && <Lock className="w-3 h-3 text-primary" />}
+            {error && (
+              <div
+                className="absolute inset-0 flex items-center justify-center bg-black/80"
+                data-ocid="scanner.error_state"
+              >
+                <div className="flex flex-col items-center gap-4 p-6 text-center">
+                  <p className="text-destructive font-semibold">
+                    {error.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={retry}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Retry Camera
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 ios-glass-light rounded-2xl px-3 py-2 border border-primary/20">
-                <Shirt className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                <span className="text-xs text-primary font-semibold">
-                  {garment.emoji} {garment.label}
-                </span>
+            )}
+
+            {isSupported === false && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                <p className="text-muted-foreground text-sm p-6 text-center">
+                  Camera not supported in this browser
+                </p>
               </div>
-            </motion.div>
-          )}
-        </div>
+            )}
+
+            {isActive && (
+              <motion.div
+                className="absolute top-3 left-3 flex flex-col gap-2"
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="flex items-center gap-2 ios-glass-light rounded-2xl px-3 py-2 border border-white/10">
+                  <div
+                    className="w-4 h-4 rounded-full flex-shrink-0 swatch-shadow"
+                    style={{ backgroundColor: activeColor }}
+                  />
+                  <span className="text-xs font-mono text-foreground/90 uppercase tracking-tight">
+                    {activeColor}
+                  </span>
+                  {lockedColor && <Lock className="w-3 h-3 text-primary" />}
+                </div>
+                <div className="flex items-center gap-2 ios-glass-light rounded-2xl px-3 py-2 border border-primary/20">
+                  <Shirt className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                  <span className="text-xs text-primary font-semibold">
+                    {garment.emoji} {garment.label}
+                  </span>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+
+        {/* ── Upload Picture Tab ── */}
+        {scannerTab === "upload" && (
+          <div className="p-4 space-y-4">
+            {!uploadedImage ? (
+              <motion.button
+                type="button"
+                onClick={() => uploadInputRef.current?.click()}
+                className="w-full flex flex-col items-center justify-center gap-3 py-12 rounded-2xl border-2 border-dashed transition-all active:scale-97"
+                style={{ borderColor: "oklch(var(--primary) / 0.4)" }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                data-ocid="scanner.upload_button"
+              >
+                <div className="w-16 h-16 rounded-full bg-primary/15 flex items-center justify-center">
+                  <ImagePlus className="w-8 h-8 text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-foreground">
+                    Upload a Photo
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Tap to choose from your gallery
+                  </p>
+                </div>
+              </motion.button>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key="uploaded"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-3"
+                >
+                  {/* Image preview */}
+                  <div className="relative rounded-2xl overflow-hidden bg-muted/40">
+                    <img
+                      src={`data:${uploadedMime};base64,${uploadedImage}`}
+                      alt="Uploaded outfit"
+                      className="w-full object-contain"
+                      style={{ maxHeight: 300 }}
+                    />
+                    {isDetecting && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
+                        <Loader2 className="w-9 h-9 text-white animate-spin" />
+                        <p className="text-white text-sm font-semibold">
+                          Analysing with AI…
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detection result */}
+                  {detectedGarmentInfo && !isDetecting && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl p-3 flex items-center gap-3"
+                      style={{
+                        background: "oklch(var(--primary) / 0.08)",
+                        border: "1px solid oklch(var(--primary) / 0.2)",
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: detectedGarmentInfo.colorHex,
+                          boxShadow: `0 0 0 2px white, 0 0 0 4px ${detectedGarmentInfo.colorHex}`,
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <p className="text-xs font-bold text-foreground">
+                            Detected:{" "}
+                            <span
+                              style={{ color: detectedGarmentInfo.colorHex }}
+                            >
+                              {detectedGarmentInfo.colorName}
+                            </span>{" "}
+                            {detectedGarmentInfo.garmentType}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Auto-selected in item selector below. You can change
+                          it if needed.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Re-upload button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedImage(null);
+                      setDetectedGarmentInfo(null);
+                    }}
+                    className="w-full py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-border/60 hover:bg-muted transition-colors"
+                    data-ocid="scanner.secondary_button"
+                  >
+                    Upload Different Photo
+                  </button>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        )}
+
+        {/* ── Open Camera Tab ── */}
+        {scannerTab === "camera" && (
+          <div className="p-4 space-y-4">
+            {!uploadedImage ? (
+              <div className="flex flex-col items-center gap-4 py-10">
+                <motion.button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="w-24 h-24 rounded-full flex items-center justify-center text-white transition-all active:scale-95"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, oklch(0.55 0.22 250), oklch(0.48 0.20 260))",
+                    boxShadow: "0 8px 32px -6px oklch(0.55 0.22 250 / 0.5)",
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.93 }}
+                  data-ocid="scanner.primary_button"
+                >
+                  <Camera className="w-10 h-10" />
+                </motion.button>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-foreground">
+                    Take a Photo
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Opens your camera to capture outfit
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key="captured"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-3"
+                >
+                  {/* Image preview */}
+                  <div className="relative rounded-2xl overflow-hidden bg-muted/40">
+                    <img
+                      src={`data:${uploadedMime};base64,${uploadedImage}`}
+                      alt="Captured outfit"
+                      className="w-full object-contain"
+                      style={{ maxHeight: 300 }}
+                    />
+                    {isDetecting && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
+                        <Loader2 className="w-9 h-9 text-white animate-spin" />
+                        <p className="text-white text-sm font-semibold">
+                          Analysing with AI…
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detection result */}
+                  {detectedGarmentInfo && !isDetecting && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-2xl p-3 flex items-center gap-3"
+                      style={{
+                        background: "oklch(var(--primary) / 0.08)",
+                        border: "1px solid oklch(var(--primary) / 0.2)",
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex-shrink-0"
+                        style={{
+                          backgroundColor: detectedGarmentInfo.colorHex,
+                          boxShadow: `0 0 0 2px white, 0 0 0 4px ${detectedGarmentInfo.colorHex}`,
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <p className="text-xs font-bold text-foreground">
+                            Detected:{" "}
+                            <span
+                              style={{ color: detectedGarmentInfo.colorHex }}
+                            >
+                              {detectedGarmentInfo.colorName}
+                            </span>{" "}
+                            {detectedGarmentInfo.garmentType}
+                          </p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Auto-selected in item selector below. You can change
+                          it if needed.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedImage(null);
+                      setDetectedGarmentInfo(null);
+                    }}
+                    className="w-full py-2 rounded-xl text-xs font-semibold text-muted-foreground border border-border/60 hover:bg-muted transition-colors"
+                    data-ocid="scanner.secondary_button"
+                  >
+                    Retake Photo
+                  </button>
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        )}
 
         {/* Color info bar */}
         <div
@@ -3264,26 +3672,83 @@ export default function ScannerPage() {
                           </button>
                         </div>
                         <div className="flex justify-between gap-1">
-                          {swatches.map((sw) => (
-                            <div
-                              key={sw.hex}
-                              className="flex flex-col items-center gap-1 flex-1"
-                            >
+                          {swatches.map((sw) => {
+                            const isSwatchActive =
+                              activePaletteSwatch === sw.hex;
+                            return (
                               <div
-                                className="w-10 h-10 rounded-full border-2 border-white/30 shadow-md flex-shrink-0"
-                                style={{
-                                  backgroundColor: sw.hex,
-                                  boxShadow: `0 2px 8px ${sw.hex}55`,
-                                }}
-                              />
-                              <span className="text-[8px] text-muted-foreground font-medium text-center leading-tight line-clamp-2">
-                                {sw.label}
-                              </span>
-                              <span className="text-[7px] font-mono text-muted-foreground/70">
-                                {getColorName(sw.hex)}
-                              </span>
-                            </div>
-                          ))}
+                                key={sw.hex}
+                                className="flex flex-col items-center gap-1 flex-1"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActivePaletteSwatch(
+                                      isSwatchActive ? null : sw.hex,
+                                    )
+                                  }
+                                  className="flex flex-col items-center gap-1 focus:outline-none transition-transform active:scale-90"
+                                  title={`Shop ${getColorName(sw.hex)}`}
+                                  data-ocid="scanner.toggle"
+                                >
+                                  <div
+                                    className="w-10 h-10 rounded-full border-2 shadow-md flex-shrink-0 transition-all"
+                                    style={{
+                                      backgroundColor: sw.hex,
+                                      boxShadow: isSwatchActive
+                                        ? `0 0 0 3px white, 0 0 0 5px ${sw.hex}, 0 4px 14px -2px ${sw.hex}88`
+                                        : `0 2px 8px ${sw.hex}55`,
+                                      borderColor: isSwatchActive
+                                        ? "white"
+                                        : "rgba(255,255,255,0.3)",
+                                    }}
+                                  />
+                                  <span className="text-[8px] text-muted-foreground font-medium text-center leading-tight line-clamp-2">
+                                    {sw.label}
+                                  </span>
+                                  <span className="text-[7px] font-mono text-muted-foreground/70">
+                                    {getColorName(sw.hex)}
+                                  </span>
+                                  <span className="text-[7px] text-primary/60 font-semibold">
+                                    {isSwatchActive ? "▲ shop" : "▼ shop"}
+                                  </span>
+                                </button>
+                                {isSwatchActive && (
+                                  <div
+                                    className="w-full mt-1 rounded-xl overflow-hidden border border-border/40"
+                                    style={{
+                                      background: "rgba(255,255,255,0.08)",
+                                    }}
+                                  >
+                                    <div className="flex flex-col gap-0.5 p-1">
+                                      {buildPaletteShopLinks(
+                                        getColorName(sw.hex),
+                                        sw.hex,
+                                        userGender,
+                                        selectedAge ?? "",
+                                      ).map((r) => (
+                                        <a
+                                          key={r.name}
+                                          href={r.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-1 text-[8px] font-semibold text-foreground bg-muted/60 hover:bg-primary/10 rounded-lg px-1.5 py-1 transition-colors truncate"
+                                          data-ocid="scanner.link"
+                                        >
+                                          <span className="text-[9px]">
+                                            {r.icon}
+                                          </span>
+                                          <span className="truncate">
+                                            {r.name}
+                                          </span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     </motion.div>

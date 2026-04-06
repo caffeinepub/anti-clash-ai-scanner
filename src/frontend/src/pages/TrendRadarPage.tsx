@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Download, Loader2, RefreshCw, TrendingUp } from "lucide-react";
+import {
+  Copy,
+  Download,
+  Loader2,
+  RefreshCw,
+  TrendingUp,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { SiWhatsapp } from "react-icons/si";
@@ -222,6 +229,9 @@ function SeasonalPaletteForecast({
     hex: string;
     garment: string;
   } | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareImgUrl, setShareImgUrl] = useState<string | null>(null);
+  const [shareCaption, setShareCaption] = useState("");
   const seasonKey = getCurrentSeason();
   const season = SEASON_PALETTES[seasonKey];
 
@@ -250,77 +260,134 @@ function SeasonalPaletteForecast({
     }
   };
 
-  const handleShare = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 800;
-    canvas.height = 420;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const buildForecastPng = (): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      // Larger canvas for readable text
+      const W = 900;
+      const H = 540;
+      const canvas = document.createElement("canvas");
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("no ctx"));
+        return;
+      }
 
-    const grad = ctx.createLinearGradient(0, 0, 800, 420);
-    grad.addColorStop(0, season.gradientFrom);
-    grad.addColorStop(1, season.gradientTo);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 800, 420);
+      // Background gradient
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      grad.addColorStop(0, season.gradientFrom);
+      grad.addColorStop(1, season.gradientTo);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(0,0,0,0.50)";
+      ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, 800, 420);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 22px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("COLOUR CLASH TREND FORECAST", 400, 45);
-
-    ctx.font = "44px Arial";
-    ctx.fillText(season.emoji, 400, 100);
-
-    ctx.font = "bold 28px Arial";
-    ctx.fillStyle = "#FFD700";
-    ctx.fillText(season.name, 400, 145);
-
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    ctx.fillText(season.desc, 400, 175);
-
-    // Color circles
-    const startX = 400 - (season.colors.length * 55) / 2;
-    for (let i = 0; i < season.colors.length; i++) {
-      const cx = startX + i * 55 + 27;
-      ctx.beginPath();
-      ctx.arc(cx, 240, 24, 0, Math.PI * 2);
-      ctx.fillStyle = season.colors[i].hex;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.4)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "11px Arial";
+      // Header
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 24px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(season.colors[i].name, cx, 275);
-    }
+      ctx.fillText("COLOUR CLASH  ✦  TREND FORECAST", W / 2, 48);
 
-    ctx.fillStyle = "#FFD700";
-    ctx.font = "bold 18px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText("COLOUR CLASH", 400, 340);
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = "13px Arial";
-    ctx.fillText("colourclash-emb.caffeine.xyz", 400, 365);
+      // Season emoji + name
+      ctx.font = "48px Arial";
+      ctx.fillText(season.emoji, W / 2, 108);
+      ctx.font = "bold 32px Arial";
+      ctx.fillStyle = "#FFD700";
+      ctx.fillText(season.name, W / 2, 152);
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const caption = `This ${season.name} palette is 🔥 according to Colour Clash! Are you ready? #ColourClash #FashionForecast
+      // Season description
+      ctx.font = "17px Arial";
+      ctx.fillStyle = "rgba(255,255,255,0.82)";
+      ctx.fillText(season.desc, W / 2, 182);
+
+      // Color swatches — two rows: circles on top, names clearly below (no overlap)
+      const count = season.colors.length;
+      const circleR = 32;
+      // Guarantee enough horizontal space; each slot = 2*R + padding
+      const slotW = Math.max(circleR * 2 + 20, Math.floor((W - 60) / count));
+      const totalW = slotW * count;
+      const startX = (W - totalW) / 2 + slotW / 2;
+      const circleY = 255; // center of circles
+      const nameY = circleY + circleR + 22; // name line 1 — always below circle bottom
+
+      for (let i = 0; i < count; i++) {
+        const cx = startX + i * slotW;
+
+        // Drop shadow behind circle
+        ctx.shadowColor = "rgba(0,0,0,0.45)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(cx, circleY, circleR, 0, Math.PI * 2);
+        ctx.fillStyle = season.colors[i].hex;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // White border
+        ctx.strokeStyle = "rgba(255,255,255,0.60)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(cx, circleY, circleR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Palette name — always drawn BELOW circle, font sized to fit slot
+        const fullName = season.colors[i].name;
+        const maxNameW = slotW - 6;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+
+        // Try single line first at 13px
+        ctx.font = "bold 13px Arial";
+        if (ctx.measureText(fullName).width <= maxNameW) {
+          ctx.fillText(fullName, cx, nameY);
+        } else {
+          // Split into two lines by word
+          const words = fullName.split(" ");
+          const mid = Math.ceil(words.length / 2);
+          const line1 = words.slice(0, mid).join(" ");
+          const line2 = words.slice(mid).join(" ");
+          // Shrink font if still too wide
+          let fontSize = 12;
+          while (
+            ctx.measureText(line1).width > maxNameW ||
+            ctx.measureText(line2).width > maxNameW
+          ) {
+            fontSize -= 1;
+            if (fontSize < 8) break;
+            ctx.font = `bold ${fontSize}px Arial`;
+          }
+          ctx.fillText(line1, cx, nameY);
+          ctx.fillText(line2, cx, nameY + fontSize + 3);
+        }
+      }
+
+      // Branding footer
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#FFD700";
+      ctx.font = "bold 20px Arial";
+      ctx.fillText("COLOUR CLASH", W / 2, H - 52);
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.font = "14px Arial";
+      ctx.fillText("colourclash-emb.caffeine.xyz", W / 2, H - 28);
+
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("toBlob failed"));
+      }, "image/png");
+    });
+
+  const handleShare = async () => {
+    try {
+      const blob = await buildForecastPng();
+      const caption = `This ${season.name} palette is 🔥 — curated by Colour Clash! Are you ready? #ColourClash #FashionForecast
 
 https://colourclash-emb.caffeine.xyz`;
       const file = new File([blob], `colour-clash-forecast-${seasonKey}.png`, {
         type: "image/png",
       });
-      // Try native share with image (works on mobile)
-      if (
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare({ files: [file] })
-      ) {
+
+      // Mobile: try native share with image file
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({
             title: "Colour Clash Forecast",
@@ -328,166 +395,245 @@ https://colourclash-emb.caffeine.xyz`;
             files: [file],
           });
           return;
-        } catch (_err) {
-          // User cancelled or browser blocked — fall through to download
+        } catch (_e) {
+          // cancelled or not supported — fall through to modal
         }
       }
-      // Desktop / fallback: download image + copy caption
+
+      // Desktop/fallback: show in-browser share modal
+      if (shareImgUrl) URL.revokeObjectURL(shareImgUrl);
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `colour-clash-forecast-${seasonKey}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      navigator.clipboard.writeText(caption).catch(() => {});
-      toast.success("Forecast card downloaded! Caption copied to clipboard.");
-    }, "image/png");
+      setShareImgUrl(url);
+      setShareCaption(caption);
+      setShowShareModal(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not build forecast image");
+    }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 340, damping: 28 }}
-      className="rounded-3xl overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${season.gradientFrom}dd, ${season.gradientTo}cc)`,
-      }}
-      data-ocid="trends.card"
-    >
-      {/* Glow effect */}
-      <div
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 340, damping: 28 }}
+        className="rounded-3xl overflow-hidden"
         style={{
-          position: "absolute",
-          top: -20,
-          right: -20,
-          width: 100,
-          height: 100,
-          borderRadius: "50%",
-          background: "rgba(255,225,53,0.15)",
-          pointerEvents: "none",
+          background: `linear-gradient(135deg, ${season.gradientFrom}dd, ${season.gradientTo}cc)`,
         }}
-      />
+        data-ocid="trends.card"
+      >
+        {/* Glow effect */}
+        <div
+          style={{
+            position: "absolute",
+            top: -20,
+            right: -20,
+            width: 100,
+            height: 100,
+            borderRadius: "50%",
+            background: "rgba(255,225,53,0.15)",
+            pointerEvents: "none",
+          }}
+        />
 
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-0.5">
-              📅 Seasonal Forecast
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{season.emoji}</span>
-              <p className="text-lg font-black text-white leading-tight">
-                {season.name}
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-0.5">
+                📅 Seasonal Forecast
               </p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{season.emoji}</span>
+                <p className="text-lg font-black text-white leading-tight">
+                  {season.name}
+                </p>
+              </div>
+              <p className="text-xs text-white/70 mt-0.5">{season.desc}</p>
             </div>
-            <p className="text-xs text-white/70 mt-0.5">{season.desc}</p>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex flex-col items-center gap-1 ml-2"
+              data-ocid="trends.secondary_button"
+            >
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
+                <Download className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-[9px] text-white/60 font-bold">Share</span>
+            </button>
           </div>
+
+          {/* Color circles */}
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {season.colors.map((color) => (
+              <button
+                key={color.hex}
+                type="button"
+                onClick={() =>
+                  setSelectedColor(
+                    selectedColor?.hex === color.hex ? null : color,
+                  )
+                }
+                className="flex flex-col items-center gap-1 transition-transform active:scale-90"
+                data-ocid="trends.button"
+              >
+                <div
+                  className="w-10 h-10 rounded-full border-2 transition-all shadow-md"
+                  style={{
+                    backgroundColor: color.hex,
+                    borderColor:
+                      selectedColor?.hex === color.hex
+                        ? "#FFD700"
+                        : "rgba(255,255,255,0.3)",
+                    transform:
+                      selectedColor?.hex === color.hex
+                        ? "scale(1.15)"
+                        : "scale(1)",
+                  }}
+                />
+                <span className="text-[9px] text-white/70 text-center leading-tight max-w-[40px] line-clamp-2">
+                  {color.name}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Selected color shop link */}
+          <AnimatePresence>
+            {selectedColor && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-white/10 rounded-2xl p-3 mb-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div
+                      className="w-6 h-6 rounded-full border-2 border-white/40 flex-shrink-0"
+                      style={{ backgroundColor: selectedColor.hex }}
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-white">
+                        {selectedColor.name}
+                      </p>
+                      <p className="text-[10px] text-white/60">
+                        {selectedColor.garment}
+                      </p>
+                    </div>
+                  </div>
+                  <a
+                    href={getShopUrl(selectedColor.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-white bg-white/20 hover:bg-white/30 transition-colors"
+                    data-ocid="trends.link"
+                  >
+                    🛍️ Shop {selectedColor.name}
+                    {activeRetailer !== "all"
+                      ? ` on ${RETAILER_FILTER.find((r) => r.key === activeRetailer)?.label || ""}`
+                      : ""}
+                  </a>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Share / Download Forecast */}
           <button
             type="button"
             onClick={handleShare}
-            className="flex flex-col items-center gap-1 ml-2"
+            className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-xs font-bold"
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "1px solid rgba(255,255,255,0.2)",
+            }}
             data-ocid="trends.secondary_button"
           >
-            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
-              <Download className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-[9px] text-white/60 font-bold">Share</span>
+            <Download className="w-3.5 h-3.5" /> Share / Download Forecast
           </button>
         </div>
+      </motion.div>
 
-        {/* Color circles */}
-        <div className="flex gap-2 mb-3 flex-wrap">
-          {season.colors.map((color) => (
-            <button
-              key={color.hex}
-              type="button"
-              onClick={() =>
-                setSelectedColor(
-                  selectedColor?.hex === color.hex ? null : color,
-                )
-              }
-              className="flex flex-col items-center gap-1 transition-transform active:scale-90"
-              data-ocid="trends.button"
-            >
-              <div
-                className="w-10 h-10 rounded-full border-2 transition-all shadow-md"
-                style={{
-                  backgroundColor: color.hex,
-                  borderColor:
-                    selectedColor?.hex === color.hex
-                      ? "#FFD700"
-                      : "rgba(255,255,255,0.3)",
-                  transform:
-                    selectedColor?.hex === color.hex
-                      ? "scale(1.15)"
-                      : "scale(1)",
-                }}
-              />
-              <span className="text-[9px] text-white/70 text-center leading-tight max-w-[40px] line-clamp-2">
-                {color.name}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Selected color shop link */}
-        <AnimatePresence>
-          {selectedColor && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="bg-white/10 rounded-2xl p-3 mb-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-6 h-6 rounded-full border-2 border-white/40 flex-shrink-0"
-                    style={{ backgroundColor: selectedColor.hex }}
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-white">
-                      {selectedColor.name}
-                    </p>
-                    <p className="text-[10px] text-white/60">
-                      {selectedColor.garment}
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href={getShopUrl(selectedColor.name)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold text-white bg-white/20 hover:bg-white/30 transition-colors"
-                  data-ocid="trends.link"
-                >
-                  🛍️ Shop {selectedColor.name}
-                  {activeRetailer !== "all"
-                    ? ` on ${RETAILER_FILTER.find((r) => r.key === activeRetailer)?.label || ""}`
-                    : ""}
-                </a>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Share WhatsApp */}
-        <a
-          href={`https://wa.me/?text=${encodeURIComponent(`This ${season.name} palette is 🔥 from Colour Clash! Try it at colourclash-emb.caffeine.xyz #ColourClash #FashionForecast`)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-2 rounded-xl text-white text-xs font-bold"
-          style={{
-            background: "rgba(255,255,255,0.15)",
-            border: "1px solid rgba(255,255,255,0.2)",
-          }}
-          data-ocid="trends.link"
+      {/* In-browser share modal — rendered OUTSIDE overflow-hidden card */}
+      {showShareModal && shareImgUrl && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4"
+          role="presentation"
+          onClick={() => setShowShareModal(false)}
+          onKeyDown={(e) => e.key === "Escape" && setShowShareModal(false)}
         >
-          <SiWhatsapp className="w-3.5 h-3.5" /> Share This Forecast
-        </a>
-      </div>
-    </motion.div>
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <img
+              src={shareImgUrl}
+              alt="Forecast card"
+              className="w-full object-contain"
+              style={{ maxHeight: "55vh" }}
+            />
+            <div className="p-4 space-y-3">
+              <div className="bg-gray-100 rounded-xl p-3 text-xs text-gray-700 leading-relaxed">
+                {shareCaption}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = shareImgUrl;
+                    a.download = `colour-clash-forecast-${seasonKey}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    toast.success("Forecast downloaded!");
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold"
+                  data-ocid="trends.button"
+                >
+                  <Download className="w-4 h-4" /> Download
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard
+                      .writeText(shareCaption)
+                      .then(() => toast.success("Caption copied!"))
+                      .catch(() => toast.error("Could not copy"));
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-200 text-gray-800 text-sm font-semibold"
+                  data-ocid="trends.copy.button"
+                >
+                  <Copy className="w-4 h-4" /> Copy Caption
+                </button>
+              </div>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(shareCaption)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-white text-sm font-semibold"
+                style={{ background: "#25D366" }}
+                data-ocid="trends.link"
+              >
+                <SiWhatsapp className="w-4 h-4" /> Share on WhatsApp
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                className="w-full py-2 rounded-xl bg-gray-100 text-sm font-medium text-gray-600 flex items-center justify-center gap-1"
+                data-ocid="trends.cancel_button"
+              >
+                <X className="w-4 h-4" /> Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

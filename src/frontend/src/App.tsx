@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   BookOpen,
   Heart,
+  HelpCircle,
   LogOut,
   ScanLine,
   Sparkles,
@@ -18,8 +19,10 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
+import AIEngineModal from "./components/AIEngineModal";
 import ColourClashLogo from "./components/ColourClashLogo";
 import GreetingOverlay from "./components/GreetingOverlay";
+import HowToUseModal from "./components/HowToUseModal";
 import NetflixIntro from "./components/NetflixIntro";
 import { FilterProvider } from "./context/FilterContext";
 import {
@@ -353,6 +356,17 @@ function AppContent() {
   const [showHoiBanner, setShowHoiBanner] = useState(
     () => localStorage.getItem("hoi_banner_dismissed") !== "1",
   );
+  const [showAIModal, setShowAIModal] = useState(
+    () => !localStorage.getItem("cc_ai_engine_preference"),
+  );
+  const [showHowTo, setShowHowTo] = useState(() => {
+    return localStorage.getItem("cc_howto_seen") !== "1";
+  });
+
+  const handleHowToClose = () => {
+    setShowHowTo(false);
+    localStorage.setItem("cc_howto_seen", "1");
+  };
 
   const handleIntroComplete = useCallback(() => {
     setShowIntro(false);
@@ -441,7 +455,17 @@ function AppContent() {
               </motion.div>
             </AnimatePresence>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowHowTo(true)}
+              className="w-8 h-8 rounded-full bg-muted/60 border border-border/50 flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 hover:border-primary/30 transition-all active:scale-90"
+              aria-label="How to use"
+              title="How to use Colour Clash"
+              data-ocid="nav.howto.button"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
             <UserArea onProfileClick={() => setShowProfile(true)} />
           </div>
         </div>
@@ -583,6 +607,17 @@ function AppContent() {
           </p>
         </div>
       </nav>
+
+      {/* How-To-Use Modal */}
+      <HowToUseModal open={showHowTo} onClose={handleHowToClose} />
+
+      {/* AI Engine Selection Modal — shown on first app open after intro */}
+      {!showIntro && (
+        <AIEngineModal
+          open={showAIModal}
+          onClose={() => setShowAIModal(false)}
+        />
+      )}
 
       {/* Full-screen Profile Takeover */}
       <div

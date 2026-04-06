@@ -1,70 +1,41 @@
-# Colour Clash - Score Tab Overhaul (v61)
+# Colour Clash
 
 ## Current State
-- OutfitScorePage.tsx (3036 lines) contains all scoring, sharing, battle, invite, and skin tone logic
-- `ColorClashBattle` component builds a side-by-side card using the CURRENT + a past lookbook entry (not a fresh friend upload)
-- `ClashLeaderboardInvite` component: 'Challenge a Friend' — generates a personalised invite card with friend's name
-- Skin tone swatches (score < 70): shows colored circles with name labels but NO shop links
-- Path to 100% section: always shows 9 swatches + shop links regardless of score
-- No score-based popup/celebration animations exist
-- Share app link is https://colourclash-emb.caffeine.xyz (no deep link to score tab)
+- App has a Login Welcome Modal (sign in/sign up) that shows to unauthenticated users
+- FilterContext has `aiPlatform` state that stores the selected AI (Gemini, ChatGPT, etc.)
+- Home filter bar has Gender, Age, Size, and AI Platform selector (collapsible)
+- Scanner (ScannerPage) has Live Color Scan (camera pixel sampling); no Upload Picture or Open Camera tabs
+- Garment type selector is manual (24 single-entity labels)
+- The 5 Complete Looks (OutfitCard) are generated via internal logic or Gemini via `getGeminiAdvice`
+- Complementary Colors section and 5 Complete Looks are generated when a color is locked
+- `geminiAI.ts` has `getGeminiAdvice` for outfit generation with gender param
+- No AI Engine selection modal distinct from the sign-in modal
 
 ## Requested Changes (Diff)
 
 ### Add
-- **Battle flow (new):** 
-  1. After scoring, show a "Start Battle" button (not just a static card)
-  2. When tapped, generate a battle share card with user's score + photo on LEFT side, RIGHT side shows placeholder "Your friend's photo here" with "Can you beat [score]?"
-  3. Share app link = `https://colourclash-emb.caffeine.xyz/?battle=1` — when a friend opens this link, the app auto-navigates to the Score tab
-  4. When friend scores their outfit, app detects the `?battle=1` URL param and shows side-by-side comparison: left = friend's just-scored photo, right = challenger's last battle entry from localStorage
-  5. Display winner badge (crown icon) on the higher scoring side
-  6. Both photos visible side-by-side with scores, winner highlighted
-
-- **Score celebration popups (AnimatePresence):**
-  - Score 70-74: subtle confetti burst + "Nice outfit! 🎉" toast
-  - Score 75-79: confetti + "Great Style! ✨" toast with color burst
-  - Score 80-84: bigger burst + "Impressive! 🌟" toast
-  - Score 85-89: fireworks + "Style Master! 🔥" modal popup (auto-dismiss 3s)
-  - Score 90-94: full-screen overlay + "Outstanding! 💎" (auto-dismiss 3s)
-  - Score 95-99: full-screen gold overlay + "Elite Stylist! 👑" (auto-dismiss 3s)
-  - Score 100: animated floating hearts (20+ hearts rise from bottom to top), full-screen pink/red overlay, "PERFECT SCORE! 💖 You are flawless!" text, auto-dismiss 4s
-  - Each tier has visually distinct animation/color
-
-- **Skin tone suggestions: shop links**
-  - When user clicks a skin tone colour swatch (below score < 70), show retailer shop links filtered by that color + home page gender/age (read `cc_gender` and `cc_age` from localStorage)
-  - Show at least: House of Indya, Myntra, Amazon, Ajio links
+1. **AI Engine Welcome Modal** -- A separate "Welcome to Colour Clash" modal that shows ONCE on first app open (checked via `cc_ai_engine_preference` in localStorage). Has: colorful gradient design, "Connect Custom AI Engine" button (redirects to AI login, waits for user to return, then marks connected), "Use Internal App Engine" button (saves preference, goes to home), "Skip" button (defaults to internal). Does NOT show if preference already exists in localStorage.
+2. **Scanner: Upload Picture tab** -- New tab in scanner UI alongside Live Color Scan. User picks image from gallery, Gemini Vision detects main clothing item + color (garment type + hex). Auto-selects the detected garment in the "What is this item?" selector. User can override the auto-selection.
+3. **Scanner: Open Camera tab** -- Third scanner tab. User captures a photo via device camera. Same Gemini Vision detection flow as Upload Picture.
+4. **Gemini Vision garment detection function** -- New export in `geminiAI.ts`: `detectGarmentFromImage(imageBase64, mimeType)` returns `{ garmentType: string, colorHex: string, colorName: string }`.
 
 ### Modify
-- **Path to 100% section:**
-  - If score === 100: hide the 9-swatch section entirely, replace with a congratulatory note: "🎯 You are perfect in colour matching! No suggestions required — your outfit is flawless as it is. Keep rocking your style!"
-  - If score < 100: show swatches as before
-
-- **ColorClashBattle component:**
-  - Rename/repurpose as `BattleField` with the new flow described above
-  - Remove the old "Generate Battle Card" that pulls from lookbook for VS
-  - New flow: user scores → "⚔️ Start a Battle" button → generates challenge card → share → friend opens link → scores → side-by-side shown with winner
-
-- **ClashLeaderboardInvite component:**
-  - Remove entirely (disable 'Challenge a Friend')
+1. **AI Engine Welcome Modal** (replaces/extends the existing login modal behavior) -- The existing sign-in modal is a separate ICP/InternetIdentity login. The new AI Engine modal is orthogonal -- it asks about AI platform preference, not account login. Show AI Engine modal after the Netflix intro and greeting overlay settle.
+2. **5 Complete Looks** -- Must pass `gender` AND `size` from FilterContext as mandatory variables into both the Gemini prompt (`getGeminiAdvice`) and the internal fallback generator. All 5 looks must strictly match active gender + size.
+3. **Auto-refresh Complementary Colors + 5 Complete Looks** -- Every time a new color is scanned (from Live Scan, Upload, or Camera), Complementary Colors section and 5 Complete Looks auto-recalculate immediately without any button tap.
+4. **getGeminiAdvice** in `geminiAI.ts` -- Add `size` parameter to the prompt so outfit advice includes size-appropriate items.
 
 ### Remove
-- `ClashLeaderboardInvite` component and all its JSX rendering
-- Old battle card that silently pulls a past lookbook entry as the "opponent"
+- Nothing is removed. Existing scanner Live Color Scan stays as the first tab.
 
 ## Implementation Plan
-1. Remove `ClashLeaderboardInvite` component and its render call
-2. Rewrite `ColorClashBattle` → `BattleField` component:
-   a. Shows 'Start Battle' button after scoring
-   b. On click: saves current entry as `cc_battle_challenger` in localStorage (score + photoDataUrl + date)
-   c. Builds battle challenge card (portrait 9:16): user photo LEFT with score, RIGHT side = placeholder with "Can you beat [score]? Upload YOUR outfit!", QR code bottom linking to `https://colourclash-emb.caffeine.xyz/?battle=1`
-   d. Share button sends this card + caption: "I scored [X]/100! Can you beat me? Open the link to start your battle! 👊 #ColourClash"
-   e. On app load: read `?battle=1` URL param → if present, auto-navigate to Score tab AND set a `battleMode` flag
-   f. After friend scores: if `cc_battle_challenger` exists AND battleMode flag, show side-by-side comparison modal: left = challenger's photo + score, right = friend's just-scored photo + score. Winner (higher score) gets a golden crown badge overlay
-   g. Show "You Win! 👑" or "They Win! 😤 Try again?" message + option to share the VS card
-3. Add score celebration popup system:
-   a. `ScoreCelebration` component triggered by score value
-   b. 70-84: toast-style notification (auto-dismiss 2.5s) with confetti particles (CSS animation)
-   c. 85-99: full-screen overlay modal (auto-dismiss 3s) with animated elements per tier
-   d. 100: floating hearts animation (AnimatePresence, 24 hearts with staggered rise), pink gradient overlay, "PERFECT SCORE!" text
-4. Modify Path to 100% section: conditional render based on score === 100
-5. Modify Skin Tone section: on swatch click, expand a shop row below (House of Indya, Myntra, Amazon, Ajio) with URLs encoded with color name + gender + age from localStorage
+1. Add `detectGarmentFromImage` to `geminiAI.ts`
+2. Add `size` param to `getGeminiAdvice` in `geminiAI.ts`
+3. Create `AIEngineModal` component in `src/frontend/src/components/AIEngineModal.tsx` -- colorful modal, saves to `cc_ai_engine_preference` in localStorage
+4. Mount `AIEngineModal` in `App.tsx` after intro -- check localStorage on mount, skip if preference exists
+5. Update `ScannerPage.tsx`:
+   - Add 3-tab scanner UI: "Live Color Scan" | "Upload Picture" | "Open Camera"
+   - Upload/Camera flow: show image preview, call `detectGarmentFromImage`, auto-select detected garment in selector
+   - Manual garment selector override still works
+   - Pass `size` from FilterContext to outfit generation
+   - Auto-refresh complementary colors + 5 Complete Looks on every new color lock (already done via state, but ensure image upload also triggers)

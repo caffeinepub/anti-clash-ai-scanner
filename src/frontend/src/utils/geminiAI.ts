@@ -49,18 +49,22 @@ export async function getGeminiAdvice(
   garmentType: string,
   gender: "man" | "woman" | "all",
   matchedHex?: string,
+  size?: string,
 ): Promise<GeminiAdvice | null> {
   const genderLabel =
     gender === "woman" ? "woman" : gender === "man" ? "man" : "person";
   const matchedPart = matchedHex
     ? `The user has also selected ${matchedHex} as a matching color.`
     : "";
+  const sizePart = size
+    ? `The user wears size ${size}. All outfit items should be appropriate for this size and body type.`
+    : "";
 
   const prompt = `You are a professional fashion stylist for Indian and global trends in 2026.
 
-A ${genderLabel} has scanned a ${garmentType} in color ${scannedHex}. ${matchedPart}
+A ${genderLabel} has scanned a ${garmentType} in color ${scannedHex}. ${matchedPart} ${sizePart}
 
-Give 5 complete tip-to-toe outfit suggestions. Each outfit must include:
+Give 5 complete tip-to-toe outfit suggestions strictly for ${genderLabel}s. Each outfit must include:
 - A short title (e.g. "Casual Chic", "Office Ready")
 - Hairstyle suggestion
 - Top (type + color name + hex)
@@ -392,5 +396,62 @@ export async function detectSkinTone(
     return "medium";
   } catch {
     return "medium";
+  }
+}
+
+export interface GarmentDetectionResult {
+  garmentType: string;
+  colorHex: string;
+  colorName: string;
+}
+
+/**
+ * Detect garment type and color from an image using Gemini Vision.
+ */
+export async function detectGarmentFromImage(
+  imageBase64: string,
+  mimeType = "image/jpeg",
+): Promise<GarmentDetectionResult> {
+  const fallback: GarmentDetectionResult = {
+    garmentType: "Shirt",
+    colorHex: "#808080",
+    colorName: "Grey",
+  };
+  try {
+    const prompt = `Look at this image. Identify the main clothing item visible.
+Return ONLY valid JSON: {"garmentType": "...", "colorHex": "#RRGGBB", "colorName": "..."}.
+garmentType must be one of: Top, T Shirt, Shirt, Blouse, Pant, Bottom, Jeans, Shorts, Skirt,
+Dress, Jacket, Suit, Hoodie, Shoes, Sneakers, Watch, Bag, Saree, Kurta, Scarf, Dupatta,
+Turban, Stole, Ethnic Wear. colorHex is the dominant clothing color as a hex code. colorName is the
+fashion-precise color name (e.g. Sky Blue, Crimson, Sage Green, Banana Yellow, Midnight Marina).`;
+    const res = await fetch(GEMINI_FLASH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 100 },
+      }),
+    });
+    if (!res.ok) return fallback;
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const json = extractJson(raw);
+    const parsed = JSON.parse(json) as GarmentDetectionResult;
+    // Validate hex
+    if (!/^#[0-9a-fA-F]{6}$/.test(parsed.colorHex)) {
+      parsed.colorHex = fallback.colorHex;
+    }
+    if (!parsed.garmentType) parsed.garmentType = fallback.garmentType;
+    if (!parsed.colorName) parsed.colorName = fallback.colorName;
+    return parsed;
+  } catch {
+    return fallback;
   }
 }
